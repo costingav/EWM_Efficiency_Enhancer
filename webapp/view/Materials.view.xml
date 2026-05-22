@@ -1,0 +1,172 @@
+
+<mvc:View
+    controllerName="bearingpoint.ewm.materialmaintenance.controller.Materials"
+    xmlns="sap.f"
+    xmlns:m="sap.m"
+    xmlns:core="sap.ui.core"
+    xmlns:mvc="sap.ui.core.mvc"
+    xmlns:smartFilterBar="sap.ui.comp.smartfilterbar"
+    xmlns:smartTable="sap.ui.comp.smarttable"
+    xmlns:sv="sap.ui.comp.smartvariants"
+    xmlns:sf="sap.ui.comp.smartfield"
+    xmlns:form="sap.ui.comp.smartform"
+    xmlns:app="http://schemas.sap.com/sapui5/extension/sap.ui.core.CustomData/1"
+    height="100%">
+
+    <DynamicPage id="dynamicPage" fitContent="true">
+        <header>
+            <DynamicPageHeader id="_IDGenDynamicPageHeader1">
+
+                
+<smartFilterBar:SmartFilterBar
+    id="smartFilterBar"
+    entitySet="ZEWM_C_MATERIAL"
+  persistencyKey="SmartTableAnalytical_Explored_V2_FILTERS4"
+    enableBasicSearch="true">
+
+    <smartFilterBar:controlConfiguration>
+        <smartFilterBar:ControlConfiguration
+            id="ccWarehouseNo"
+            key="WarehouseNo"
+            visible="true"
+            visibleInAdvancedArea="true"
+            index="10" />
+
+        <smartFilterBar:ControlConfiguration
+            id="ccMaterialNumber"
+            key="MaterialNumber"
+            visible="true"
+            visibleInAdvancedArea="true"
+            index="20" />
+
+                        
+<smartFilterBar:ControlConfiguration
+    id="ccCtrlIndicatorProcessType"
+    key="CtrlIndicatorProcessType"
+    visible="true"
+    visibleInAdvancedArea="true"
+    index="30"
+    hasValueHelpDialog="true" 
+    displayBehaviour="descriptionAndId" />
+
+        <smartFilterBar:ControlConfiguration
+            id="ccProductLoadCategory"
+            key="ProductLoadCategory"
+            visible="true"
+            visibleInAdvancedArea="true"
+            index="40" />
+
+        <smartFilterBar:ControlConfiguration
+            id="ccStorageBinType"
+            key="StorageBinType"
+            visible="true"
+            visibleInAdvancedArea="true"
+            index="50" />
+
+        <smartFilterBar:ControlConfiguration
+            id="ccStockDeterminationGroup"
+            key="StockDeterminationGroup"
+            visible="true"
+            visibleInAdvancedArea="true"
+            index="60" />
+
+        <smartFilterBar:ControlConfiguration
+            id="ccQualityInspectionGroup"
+            key="QualityInspectionGroup"
+            visible="true"
+            visibleInAdvancedArea="true"
+            index="70" />
+
+        <smartFilterBar:ControlConfiguration
+            id="ccRecommendedStorageQuantity"
+            key="RecommendedStorageQuantity"
+            visible="true"
+            visibleInAdvancedArea="true"
+            index="80" />
+
+        <smartFilterBar:ControlConfiguration
+            id="ccDemandQuantity"
+            key="DemandQuantity"
+            visible="true"
+            visibleInAdvancedArea="true"
+            index="90" />
+
+            
+
+    </smartFilterBar:controlConfiguration>
+
+    <smartFilterBar:layoutData>
+        <m:FlexItemData id="_IDGenFlexItemData1" shrinkFactor="0"/>
+    </smartFilterBar:layoutData>
+</smartFilterBar:SmartFilterBar>
+
+
+            </DynamicPageHeader>
+        </header>
+
+        <content>
+            <m:VBox id="mainContentBox" width="100%">
+
+                <smartTable:SmartTable
+                    id="LineItemsSmartTable"
+                    entitySet="ZEWM_C_MATERIAL"
+                    smartFilterId="smartFilterBar"
+                    tableType="ResponsiveTable"
+                    enableAutoBinding="false"
+                    useVariantManagement="true"
+                    useTablePersonalisation="true"
+                    header="{i18n>smartTableHeader}"
+                    initiallyVisibleFields="WarehouseNo,MaterialNumber,MaterialDesc,PutawayControl,StorSectInd,StockRemovalCtrl,BulkStorage,ProductLoadCategory,StockDeterminationGroup,RecommendedStorageQuantity,QualityInspectionGroup,MinShelfLife"
+                    requestAtLeastFields="MaterialId,Scuguid,EntitledId,WarehouseNo,Entitled,MaterialNumber,MaterialDesc"
+                    beforeRebindTable="onBeforeRebindTable"
+                    enableExport="true"
+                    beforeExport="onBeforeExport"
+                    showRowCount="true"
+                    persistencyKey="SmartTableAnalytical_Explored_V2"
+                    class="sapUiResponsiveContentPadding"
+                    enableAutoColumnWidth="true"
+                    editTogglable="true"
+                    showDetailsButton="true"
+                    detailsButtonSetting="Medium,Low"
+                    demandPopin="true"
+                    app:useSmartField="true"
+                    editToggled="onEditToggled"
+                    placeToolbarInTable="true">
+
+                
+<smartTable:customToolbar>
+    <m:Toolbar id="_IDGenToolbar">
+        <m:ToolbarSpacer id="_IDGenToolbarSpacer1"/>
+        <m:Button
+            id="_IDGenButton"
+            icon="sap-icon://create"
+            enabled="false"
+            press="onCreate"
+            text="{i18n>Create}"/>
+        <m:Button
+            id="_MassChange"
+            icon="sap-icon://request"
+            enabled="false"
+            press="onMassChange"
+            text="{i18n>MassChange}"/>
+    </m:Toolbar>
+</smartTable:customToolbar>
+
+
+                    <smartTable:layoutData>
+                        <m:FlexItemData id="_IDGenFlexItemData2" growFactor="1" baseSize="0%"/>
+                    </smartTable:layoutData>
+
+                    <m:Table
+                        id="_IDGenTable"
+                        growing="true"
+                        growingThreshold="20"
+                        growingScrollToLoad="true"
+                        mode="SingleSelectLeft"
+                        sticky="ColumnHeaders,HeaderToolbar"/>
+                </smartTable:SmartTable>
+
+            </m:VBox>
+        </content>
+    </DynamicPage>
+</mvc:View>

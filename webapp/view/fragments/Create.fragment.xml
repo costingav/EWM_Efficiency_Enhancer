@@ -1,0 +1,223 @@
+
+<core:FragmentDefinition
+    xmlns="sap.m"
+    xmlns:core="sap.ui.core"
+    xmlns:form="sap.ui.comp.smartform"
+    xmlns:sf="sap.ui.comp.smartfield">
+
+    <Dialog
+        id="createDialog"
+        title="{i18n>dialogCreate}"
+        contentWidth="28rem"
+        draggable="true"
+        resizable="true">
+
+        <content>
+            <form:SmartForm id="sfCreate" editable="true">
+                <form:layout>
+                    <form:ColumnLayout
+                        id="_IDGenColumnLayoutCreate"
+                        columnsM="1"
+                        columnsL="1"
+                        columnsXL="1"/>
+                </form:layout>
+
+                <form:Group id="createG1">
+
+                    <!-- Required business keys -->
+                    <form:GroupElement id="createWH-fields">
+                        <sf:SmartField
+                            id="warehouseNo"
+                            value="{WarehouseNo}"
+                            mandatory="true"
+                            change="onChangeWH"/>
+                    </form:GroupElement>
+
+                    <form:GroupElement id="createEntitled-fields">
+                        <sf:SmartField
+                            id="entitled"
+                            value="{Entitled}"
+                            mandatory="true"
+                            change="onChangeEntitled"/>
+                    </form:GroupElement>
+
+                    <!-- Existing original VH-backed fields -->
+                    <form:GroupElement id="createG1-fields">
+                        <sf:SmartField
+                            id="createPutAway"
+                            value="{PutawayControl}"
+                            change="onCreateFieldChange" />
+                    </form:GroupElement>
+
+                    <form:GroupElement id="createG2-fields">
+                        <sf:SmartField
+                            id="createStorSectInd"
+                            value="{StorSectInd}"
+                            change="onCreateFieldChange" />
+                    </form:GroupElement>
+
+                    <form:GroupElement id="createG3-fields">
+                        <sf:SmartField
+                            id="createStockRemovalCtrl"
+                            value="{StockRemovalCtrl}"
+                            change="onCreateFieldChange" />
+                    </form:GroupElement>
+
+                    <form:GroupElement id="createG4-fields">
+                        <sf:SmartField
+                            id="createBulkStorage"
+                            value="{BulkStorage}"
+                            change="onCreateFieldChange" />
+                    </form:GroupElement>
+
+                    <!-- Newly added / likely VH-backed fields -->
+                    <form:GroupElement id="createG5-fields">
+                        <sf:SmartField
+                            id="createProcBlockProfile"
+                            value="{ProcBlockProfile}"
+                            change="onCreateFieldChange" />
+                    </form:GroupElement>
+
+                    <form:GroupElement id="createG6-fields">
+                        <sf:SmartField
+                            id="createCtrlIndicatorProcessType"
+                            value="{CtrlIndicatorProcessType}"
+                            change="onCreateFieldChange" />
+                    </form:GroupElement>
+
+                    <form:GroupElement id="createG7-fields">
+                        <sf:SmartField
+                            id="createProductLoadCategory"
+                            value="{ProductLoadCategory}"
+                            change="onCreateFieldChange" />
+                    </form:GroupElement>
+
+                    <form:GroupElement id="createG8-fields">
+                        <sf:SmartField
+                            id="createCycleCountingIndicator"
+                            value="{CycleCountingIndicator}"
+                            change="onCreateFieldChange" />
+                    </form:GroupElement>
+
+                    <!-- Numeric / direct-entry fields -->
+                    <form:GroupElement id="createG9-fields">
+                        <sf:SmartField
+                            id="createMinShelfLife"
+                            value="{MinShelfLife}" />
+                    </form:GroupElement>
+
+                    <form:GroupElement id="createG10-fields">
+                        <sf:SmartField
+                            id="createQuantityClassMerchandiseDistr"
+                            value="{QuantityClassMerchandiseDistr}" />
+                    </form:GroupElement>
+
+                    <!-- Preferred UoM likely VH-backed -->
+                    <form:GroupElement id="createG11-fields">
+                        <sf:SmartField
+                            id="createPreferredAltUoMforWarehouseOp"
+                            value="{PrefferedAltUoMforWarehouseOp}"
+                            change="onCreateFieldChange" />
+                    </form:GroupElement>
+
+                    <!-- Likely VH-backed -->
+                    <form:GroupElement id="createG12-fields">
+                        <sf:SmartField
+                            id="createQualityInspectionGroup"
+                            value="{QualityInspectionGroup}"
+                            change="onCreateFieldChange" />
+                    </form:GroupElement>
+
+                    <form:GroupElement id="createG13-fields">
+                        <sf:SmartField
+                            id="createStorageBinType"
+                            value="{StorageBinType}"
+                            change="onCreateFieldChange" />
+                    </form:GroupElement>
+
+                    <form:GroupElement id="createG14-fields">
+                        <sf:SmartField
+                            id="createStockDeterminationGroup"
+                            value="{StockDeterminationGroup}"
+                            change="onCreateFieldChange" />
+                    </form:GroupElement>
+
+                    <form:GroupElement id="createG15-fields">
+                        <sf:SmartField
+                            id="createRelevanceForTwoStepPicking"
+                            value="{RelevanceForTwoStepPicking}"
+                            change="onCreateFieldChange" />
+                    </form:GroupElement>
+
+                    <form:GroupElement id="createG16-fields">
+                        <sf:SmartField
+                            id="createStagingAreaDoorDetGroup"
+                            value="{StagingAreaDoorDetGroup}"
+                            change="onCreateFieldChange" />
+                    </form:GroupElement>
+
+                    <!-- Numeric / direct-entry fields -->
+                    <form:GroupElement id="createG17-fields">
+                        <sf:SmartField
+                            id="createNumberOfSalesOrderItems"
+                            value="{NumberOfSalesOrderItems}" />
+                    </form:GroupElement>
+
+                    <form:GroupElement id="createG18-fields">
+                        <sf:SmartField
+                            id="createRecommendedStorageQuantity"
+                            value="{RecommendedStorageQuantity}" />
+                    </form:GroupElement>
+
+                    <form:GroupElement id="createG19-fields">
+                        <sf:SmartField
+                            id="createDimentioRatio"
+                            value="{DimentioRatio}" />
+                    </form:GroupElement>
+
+                    <form:GroupElement id="createG20-fields">
+                        <sf:SmartField
+                            id="createWeightIndicator"
+                            value="{WeightIndicator}" />
+                    </form:GroupElement>
+
+                    <form:GroupElement id="createG21-fields">
+                        <sf:SmartField
+                            id="createVolumeIndicator"
+                            value="{VolumeIndicator}" />
+                    </form:GroupElement>
+
+                    <form:GroupElement id="createG22-fields">
+                        <sf:SmartField
+                            id="createWidthIndicator"
+                            value="{WidthIndicator}" />
+                    </form:GroupElement>
+
+                    <form:GroupElement id="createG23-fields">
+                        <sf:SmartField
+                            id="createHeightIndicator"
+                            value="{HeightIndicator}" />
+                    </form:GroupElement>
+
+                </form:Group>
+            </form:SmartForm>
+        </content>
+
+        <footer>
+            <Toolbar id="_createIDGenToolbar1">
+                <content>
+                    <ToolbarSpacer id="_createIDGenToolbarSpacer" />
+                    <Button
+                        id="createSubmitBtn"
+                        text="{i18n>Submit}"
+                        press=".onCreateWarehouse" />
+                    <Button
+                        id="createCancelBtn"
+                        text="{i18n>Cancel}"
+                        press=".closeCreateDialog"
+                        ariaHasPopup="Dialog" />
+                </content>
+            </Toolbar>
+        </footer>
+    </Dialog>
+</core:FragmentDefinition>

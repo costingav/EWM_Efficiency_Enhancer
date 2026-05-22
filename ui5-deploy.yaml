@@ -1,0 +1,26 @@
+# yaml-language-server: $schema=https://sap.github.io/ui5-tooling/schema/ui5.yaml.json
+
+specVersion: "3.1"
+metadata:
+  name: bearingpoint.ewm.materialmaintenance
+type: application
+builder:
+  resources:
+    excludes:
+      - /test/**
+      - /localService/**
+  customTasks:
+    - name: deploy-to-abap
+      afterTask: generateCachebusterInfo
+      configuration:
+        target:
+          destination: S06_P
+          client: 115
+          url: http://bedusapp06.dev.bearingpoint.com:50000/
+        app:
+          name: ZEWM_M_MATERIAL
+          description: EWM Efficiency Enhancer
+          package: ZEWM_MAINT_MATERIALS
+          transport: S06K905339
+        exclude:
+          - /test/

@@ -1,0 +1,205 @@
+<core:FragmentDefinition
+    xmlns="sap.m"
+    xmlns:core="sap.ui.core"
+    xmlns:form="sap.ui.comp.smartform"
+    xmlns:sf="sap.ui.comp.smartfield">
+
+    <Dialog
+        id="massChangeDialog"
+        title="{i18n>dialogMassChange}"
+        contentWidth="28rem"
+        draggable="true"
+        resizable="true">
+
+        <content>
+            <form:SmartForm id="SF1" editable="true">
+                <form:layout>
+                    <form:ColumnLayout
+                        id="_IDGenColumnLayout"
+                        columnsM="1"
+                        columnsL="1"
+                        columnsXL="1"/>
+                </form:layout>
+
+                <form:Group id="G1">
+
+                    <!-- Existing 4 fields with VH -->
+                    <form:GroupElement id="G1-fields">
+                        <sf:SmartField
+                            id="PutAway"
+                            value="{PutawayControl}"
+                            change="onMassFieldChange" />
+                    </form:GroupElement>
+
+                    <form:GroupElement id="G2-fields">
+                        <sf:SmartField
+                            id="StorSectInd"
+                            value="{StorSectInd}"
+                            change="onMassFieldChange" />
+                    </form:GroupElement>
+
+                    <form:GroupElement id="G3-fields">
+                        <sf:SmartField
+                            id="StockRemovalCtrl"
+                            value="{StockRemovalCtrl}"
+                            change="onMassFieldChange" />
+                    </form:GroupElement>
+
+                    <form:GroupElement id="G4-fields">
+                        <sf:SmartField
+                            id="BulkStorage"
+                            value="{BulkStorage}"
+                            change="onMassFieldChange" />
+                    </form:GroupElement>
+
+                    <!-- Newly added / likely VH-backed fields -->
+                    <form:GroupElement id="G5-fields">
+                        <sf:SmartField
+                            id="ProcBlockProfile"
+                            value="{ProcBlockProfile}"
+                            change="onMassFieldChange" />
+                    </form:GroupElement>
+
+                    <form:GroupElement id="G6-fields">
+                        <sf:SmartField
+                            id="CtrlIndicatorProcessType"
+                            value="{CtrlIndicatorProcessType}"
+                            change="onMassFieldChange" />
+                    </form:GroupElement>
+
+                    <form:GroupElement id="G7-fields">
+                        <sf:SmartField
+                            id="ProductLoadCategory"
+                            value="{ProductLoadCategory}"
+                            change="onMassFieldChange" />
+                    </form:GroupElement>
+
+                    <form:GroupElement id="G8-fields">
+                        <sf:SmartField
+                            id="CycleCountingIndicator"
+                            value="{CycleCountingIndicator}"
+                            change="onMassFieldChange" />
+                    </form:GroupElement>
+
+                    <!-- Numeric / direct-entry fields -->
+                    <form:GroupElement id="G9-fields">
+                        <sf:SmartField
+                            id="MinShelfLife"
+                            value="{MinShelfLife}" />
+                    </form:GroupElement>
+
+                    <form:GroupElement id="G10-fields">
+                        <sf:SmartField
+                            id="QuantityClassMerchandiseDistr"
+                            value="{QuantityClassMerchandiseDistr}" />
+                    </form:GroupElement>
+
+                    <!-- Preferred UoM likely VH-backed -->
+                    <form:GroupElement id="G11-fields">
+                        <sf:SmartField
+                            id="PrefferedAltUoMforWarehouseOp"
+                            value="{PrefferedAltUoMforWarehouseOp}"
+                            change="onMassFieldChange" />
+                    </form:GroupElement>
+
+                    <!-- Likely VH-backed -->
+                    <form:GroupElement id="G12-fields">
+                        <sf:SmartField
+                            id="QualityInspectionGroup"
+                            value="{QualityInspectionGroup}"
+                            change="onMassFieldChange" />
+                    </form:GroupElement>
+
+                    <form:GroupElement id="G13-fields">
+                        <sf:SmartField
+                            id="StorageBinType"
+                            value="{StorageBinType}"
+                            change="onMassFieldChange" />
+                    </form:GroupElement>
+
+                    <form:GroupElement id="G14-fields">
+                        <sf:SmartField
+                            id="StockDeterminationGroup"
+                            value="{StockDeterminationGroup}"
+                            change="onMassFieldChange" />
+                    </form:GroupElement>
+
+                    <form:GroupElement id="G15-fields">
+                        <sf:SmartField
+                            id="RelevanceForTwoStepPicking"
+                            value="{RelevanceForTwoStepPicking}"
+                            change="onMassFieldChange" />
+                    </form:GroupElement>
+
+                    <form:GroupElement id="G16-fields">
+                        <sf:SmartField
+                            id="StagingAreaDoorDetGroup"
+                            value="{StagingAreaDoorDetGroup}"
+                            change="onMassFieldChange" />
+                    </form:GroupElement>
+
+                    <!-- Numeric / direct-entry fields -->
+                    <form:GroupElement id="G17-fields">
+                        <sf:SmartField
+                            id="NumberOfSalesOrderItems"
+                            value="{NumberOfSalesOrderItems}" />
+                    </form:GroupElement>
+
+                    <form:GroupElement id="G18-fields">
+                        <sf:SmartField
+                            id="RecommendedStorageQuantity"
+                            value="{RecommendedStorageQuantity}" />
+                    </form:GroupElement>
+
+                    <form:GroupElement id="G19-fields">
+                        <sf:SmartField
+                            id="DimentioRatio"
+                            value="{DimentioRatio}" />
+                    </form:GroupElement>
+
+                    <form:GroupElement id="G20-fields">
+                        <sf:SmartField
+                            id="WeightIndicator"
+                            value="{WeightIndicator}" />
+                    </form:GroupElement>
+
+                    <form:GroupElement id="G21-fields">
+                        <sf:SmartField
+                            id="VolumeIndicator"
+                            value="{VolumeIndicator}" />
+                    </form:GroupElement>
+
+                    <form:GroupElement id="G22-fields">
+                        <sf:SmartField
+                            id="WidthIndicator"
+                            value="{WidthIndicator}" />
+                    </form:GroupElement>
+
+                    <form:GroupElement id="G23-fields">
+                        <sf:SmartField
+                            id="HeightIndicator"
+                            value="{HeightIndicator}" />
+                    </form:GroupElement>
+
+                </form:Group>
+            </form:SmartForm>
+        </content>
+
+        <footer>
+            <Toolbar id="_IDGenToolbar1">
+                <content>
+                    <ToolbarSpacer id="_IDGenToolbarSpacer" />
+                    <Button
+                        id="apply"
+                        text="{i18n>Apply}"
+                        press=".applyMassChange" />
+                    <Button
+                        id="cancel"
+                        text="{i18n>Cancel}"
+                        press="._closeDialog"
+                        ariaHasPopup="Dialog" />
+                </content>
+            </Toolbar>
+        </footer>
+    </Dialog>
+</core:FragmentDefinition>

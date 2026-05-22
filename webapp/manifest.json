@@ -1,0 +1,160 @@
+
+{
+  "_version": "1.44.0",
+  "sap.app": {
+    "id": "bearingpoint.ewm.materialmaintenance",
+    "type": "application",
+    "i18n": "i18n/i18n.properties",
+    "applicationVersion": {
+      "version": "0.0.1"
+    },
+    "title": "{{appTitle}}",
+    "description": "{{appDescription}}",
+    "resources": "resources.json",
+    "sourceTemplate": {
+      "id": "@sap/generator-fiori:basic",
+      "version": "1.14.4",
+      "toolsId": "c4586e57-e9a3-4aea-a475-fff379723831"
+    },
+    "dataSources": {
+      "mainService": {
+        "uri": "/sap/opu/odata/sap/ZEWM_MATERIAL_SRV/",
+        "type": "OData",
+        "settings": {
+          "initialLoad": "Enabled",
+          "odataVersion": "2.0",
+          "annotations": [
+            "ZEWM_MATERIAL_ANNO_MDL",
+            "annotation"
+          ]
+        }
+      
+      },
+      "ZEWM_MATERIAL_ANNO_MDL": {
+        "type": "ODataAnnotation",
+        "uri": "/sap/opu/odata/IWFND/CATALOGSERVICE;v=2/Annotations(TechnicalName='ZEWM_MATERIAL_ANNO_MDL',Version='0001')/$value/",
+        "settings": {
+          "localUri": "localService/ZEWM_MATERIAL_ANNO_MDL.xml"
+        }
+      },
+      "annotation": {
+        "type": "ODataAnnotation",
+        "uri": "annotations/annotation.xml",
+        "settings": {
+          "localUri": "annotations/annotation.xml"
+        }
+      }
+    },
+    "crossNavigation": {
+      "inbounds": {
+        "EWM_Material-display": {
+          "semanticObject": "EWM_Material",
+          "action": "display",
+          "title": "{{appTitle}}",
+          "signature": {
+            "parameters": {},
+            "additionalParameters": "allowed"
+          }
+        }
+      }
+    }
+  },
+
+  "sap.ui": {
+    "technology": "UI5",
+    "fullWidth": true,
+    "deviceTypes": {
+      "desktop": true,
+      "tablet": true,
+      "phone": true
+    },
+    "icons": {
+      "icon": "",
+      "favIcon": "",
+      "phone": "",
+      "phone@2": "",
+      "tablet": "",
+      "tablet@2": ""
+    }
+  },
+
+  "sap.ui5": {
+    "flexEnabled": true,
+    "dependencies": {
+      "minUI5Version": "1.129.2",
+      "libs": {
+        "sap.m": {},
+        "sap.ui.core": {},
+        "sap.f": {},
+        "sap.ui.comp": {},
+        "sap.ui.table": {},
+        "sap.ushell": {}
+      }
+    },
+    "contentDensities": {
+      "compact": true,
+      "cozy": true
+    },
+    "models": {
+      "i18n": {
+        "type": "sap.ui.model.resource.ResourceModel",
+        "settings": {
+          "bundleName": "bearingpoint.ewm.materialmaintenance.i18n.i18n",
+          "supportedLocales": [
+            ""
+          ],
+          "fallbackLocale": ""
+        }
+      },
+      "": {
+        "dataSource": "mainService",
+        "preload": false,
+        "settings": {
+          "defaultBindingMode": "TwoWay"
+        }
+      }
+      
+    },
+    "resources": {
+      "css": [
+        {
+          "uri": "css/style.css"
+        }
+      ]
+    },
+    "routing": {
+      "config": {
+        "routerClass": "sap.m.routing.Router",
+        "viewType": "XML",
+        "async": true,
+        "controlId": "app",
+        "controlAggregation": "pages",
+        "clearControlAggregation": false
+      },
+      "routes": [
+        {
+          "name": "RouteMaterials",
+          "pattern": ":?query:",
+          "target": "TargetMaterials"
+        }
+
+      ],
+      "targets": {
+        "TargetMaterials": {
+          "viewType": "XML",
+          "viewId": "Materials",
+          "viewName": "bearingpoint.ewm.materialmaintenance.view.Materials",
+          "controlAggregation": "pages",
+          "controlId": "app",
+          "transition": "slide"
+        }
+      }
+    },
+    "rootView": {
+      "viewName": "bearingpoint.ewm.materialmaintenance.view.App",
+      "type": "XML",
+      "id": "App",
+      "async": true
+    }
+  }
+}
