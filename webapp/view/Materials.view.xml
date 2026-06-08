@@ -21,7 +21,7 @@
 <smartFilterBar:SmartFilterBar
     id="smartFilterBar"
     entitySet="ZEWM_C_MATERIAL"
-  persistencyKey="SmartTableAnalytical_Explored_V2_FILTERS4"
+  persistencyKey="SmartTableAnalytical_Explored_V3_FILTERS4"
     enableBasicSearch="true">
 
     <smartFilterBar:controlConfiguration>
@@ -91,7 +91,14 @@
             visibleInAdvancedArea="true"
             index="90" />
 
-            
+
+<smartFilterBar:ControlConfiguration
+    id="ccProcBlockProfile"
+    key="ProcBlockProfile"
+    visible="true"
+    visibleInAdvancedArea="true"
+    index="35"
+    hasValueHelpDialog="true"/>
 
     </smartFilterBar:controlConfiguration>
 
@@ -116,13 +123,13 @@
                     useVariantManagement="true"
                     useTablePersonalisation="true"
                     header="{i18n>smartTableHeader}"
-                    initiallyVisibleFields="WarehouseNo,MaterialNumber,MaterialDesc,PutawayControl,StorSectInd,StockRemovalCtrl,BulkStorage,ProductLoadCategory,StockDeterminationGroup,RecommendedStorageQuantity,QualityInspectionGroup,MinShelfLife"
-                    requestAtLeastFields="MaterialId,Scuguid,EntitledId,WarehouseNo,Entitled,MaterialNumber,MaterialDesc"
+                    initiallyVisibleFields="WarehouseNo,MaterialNumber,MaterialDesc,PutawayControl,StorSectInd,StockRemovalCtrl,BulkStorage,ProductLoadCategory,StockDeterminationGroup,RecommendedStorageQuantity,QualityInspectionGroup,MinShelfLife,ProcBlockProfile"
+                    requestAtLeastFields="MaterialId,Scuguid,EntitledId,WarehouseNo,Entitled,MaterialNumber,MaterialDesc,ProcBlockProfile"
                     beforeRebindTable="onBeforeRebindTable"
                     enableExport="true"
                     beforeExport="onBeforeExport"
                     showRowCount="true"
-                    persistencyKey="SmartTableAnalytical_Explored_V2"
+                    persistencyKey="SmartTableAnalytical_Explored_V3"
                     class="sapUiResponsiveContentPadding"
                     enableAutoColumnWidth="true"
                     editTogglable="true"
