@@ -10,11 +10,22 @@ sap.ui.define([
 
     return Controller.extend("bearingpoint.ewm.materialmaintenance.controller.Materials", {
 
-
-  
-
 onInit: function () {
     var oView = this.getView();
+
+var oModel = oView.getModel();
+
+if (oModel) {
+    oModel.setDefaultBindingMode(sap.ui.model.BindingMode.TwoWay);
+} else {
+    oView.attachEventOnce("modelContextChange", function () {
+        var oModelLater = this.getView().getModel();
+        if (oModelLater) {
+            oModelLater.setDefaultBindingMode(sap.ui.model.BindingMode.TwoWay);
+        }
+    }.bind(this));
+}
+
     var oSmartTable = oView.byId("LineItemsSmartTable");
     var oSmartFilterBar = oView.byId("smartFilterBar");
 
@@ -26,9 +37,8 @@ onInit: function () {
     });
     oView.setModel(oViewModel, "viewModel");
 
-    
- // ===============================
-    // SmartTable init (CLEAN)
+    // ===============================
+    // SmartTable init
     // ===============================
     oSmartTable.attachInitialise(function () {
 
@@ -37,21 +47,45 @@ onInit: function () {
 
         if (oTable) {
 
-            // ✅ ALWAYS force MultiSelect for main table
             if (oTable.isA("sap.m.Table")) {
                 oTable.setMode("MultiSelect");
             }
 
             oTable.attachSelectionChange(this.onTableSelectionChange.bind(this));
 
+var oTable = this.table;
+
+oTable.getItems().forEach(function (oItem) {
+    oItem.getCells().forEach(function (oCell) {
+        if (oCell.attachChange && !oCell._changeAttached) {
+            oCell.attachChange(this.onFieldChange.bind(this));
+            oCell._changeAttached = true;
+        }
+    }.bind(this));
+}.bind(this));
+
+
             if (oTable.attachUpdateFinished) {
                 oTable.attachUpdateFinished(function () {
+
                     this._scheduleRowViewSetup();
+                    this._wireStorageBinValidation();
+
+                    //  IMPORTANT: apply after full rendering
+                    setTimeout(function () {
+                        this._applyEntitledReadOnly();
+                    }.bind(this), 200);
+
                 }.bind(this));
             }
         }
 
         this._scheduleRowViewSetup();
+
+        //  IMPORTANT: apply after init render
+        setTimeout(function () {
+            this._applyEntitledReadOnly();
+        }.bind(this), 200);
 
     }.bind(this));
 
@@ -60,98 +94,405 @@ onInit: function () {
     // ===============================
     oView.addEventDelegate({
         onAfterShow: function () {
+
             this._scheduleRowViewSetup();
+            this._wireStorageBinValidation();
+
+            //  IMPORTANT: ensure binding ready
+            setTimeout(function () {
+                this._applyEntitledReadOnly();
+            }.bind(this), 200);
+
         }.bind(this)
     });
 
 
-// ===============================
-// ✅ ValueHelpDialog patch (FINAL - MultiSelect + hide Warehouse)
-// ===============================
-if (oSmartFilterBar && !this._vhPatched) {
-    this._vhPatched = true;
+    // ===============================
+    //  ValueHelpDialog patch (FINAL - MultiSelect + hide Warehouse)
+    // ===============================
+    if (oSmartFilterBar && !this._vhPatched) {
+        this._vhPatched = true;
 
-    var fnOrigAfterRendering = ValueHelpDialog.prototype.onAfterRendering;
+        var fnOrigAfterRendering = ValueHelpDialog.prototype.onAfterRendering;
 
-    ValueHelpDialog.prototype.onAfterRendering = function () {
+        ValueHelpDialog.prototype.onAfterRendering = function () {
 
-        if (fnOrigAfterRendering) {
-            fnOrigAfterRendering.apply(this, arguments);
-        }
+            if (fnOrigAfterRendering) {
+                fnOrigAfterRendering.apply(this, arguments);
+            }
 
-        var oDialog = this;
+            var oDialog = this;
 
-        setTimeout(function () {
+            setTimeout(function () {
 
-            try {
+                try {
 
-                // ✅ ensure this is ValueHelpDialog
-                if (!oDialog || !oDialog.isA("sap.ui.comp.valuehelpdialog.ValueHelpDialog")) {
-                    return;
-                }
-
-                var oTable = oDialog.getTable && oDialog.getTable();
-                if (!oTable) return;
-
-                // ✅ KEEP MULTISELECT (checkboxes)
-                if (oTable.isA("sap.m.Table")) {
-                    oTable.setMode("MultiSelect");
-                }
-
-                // ✅ robust hide logic
-                var fnHideLgnum = function () {
-
-                    var aCols = oTable.getColumns() || [];
-                    var aItems = oTable.getItems() || [];
-
-                    // ✅ fallback if no data yet
-                    if (aItems.length === 0) {
-                        aCols.forEach(function (oCol) {
-                            var sHeader = oCol.getHeader && oCol.getHeader().getText();
-                            if (sHeader && sHeader.toLowerCase().includes("warehouse")) {
-                                oCol.setVisible(false);
-                            }
-                        });
+                    //  ensure this is ValueHelpDialog
+                    if (!oDialog || !oDialog.isA("sap.ui.comp.valuehelpdialog.ValueHelpDialog")) {
                         return;
                     }
 
-                    var aCells = aItems[0].getCells();
+                    var oTable = oDialog.getTable && oDialog.getTable();
+                    if (!oTable) {
+                        return;
+                    }
 
-                    aCols.forEach(function (oCol, i) {
+                    //  KEEP MULTISELECT (checkboxes)
+                    if (oTable.isA("sap.m.Table")) {
+                        oTable.setMode("MultiSelect");
+                    }
 
-                        if (!aCells[i]) return;
+                    //  robust hide logic
+                    var fnHideLgnum = function () {
 
-                        var oBinding = aCells[i].getBinding && aCells[i].getBinding("text");
-                        var sPath = oBinding && oBinding.getPath && oBinding.getPath();
+                        var aCols = oTable.getColumns() || [];
+                        var aItems = oTable.getItems() || [];
 
-                        // ✅ flexible detection
-                        if (sPath && sPath.toLowerCase().includes("lgnum")) {
-                            oCol.setVisible(false);
+                        //  fallback if no data yet
+                        if (aItems.length === 0) {
+                            aCols.forEach(function (oCol) {
+                                var oHeader = oCol.getHeader && oCol.getHeader();
+                                var sHeader = oHeader && oHeader.getText && oHeader.getText();
+
+                                if (sHeader && sHeader.toLowerCase().includes("warehouse")) {
+                                    oCol.setVisible(false);
+                                }
+                            });
+                            return;
                         }
-                    });
-                };
 
-                // ✅ initial hide
-                fnHideLgnum();
+                        var aCells = aItems[0].getCells();
 
-                // ✅ reapply AFTER every refresh (CRITICAL)
-                if (oTable.attachUpdateFinished) {
-                    oTable.detachUpdateFinished(oDialog._vhHideHandler);
-                    oDialog._vhHideHandler = fnHideLgnum;
-                    oTable.attachUpdateFinished(oDialog._vhHideHandler);
+                        aCols.forEach(function (oCol, i) {
+
+                            if (!aCells[i]) {
+                                return;
+                            }
+
+                            var oBinding = aCells[i].getBinding && aCells[i].getBinding("text");
+                            var sPath = oBinding && oBinding.getPath && oBinding.getPath();
+
+                            // ✅ flexible detection
+                            if (sPath && sPath.toLowerCase().includes("lgnum")) {
+                                oCol.setVisible(false);
+                            }
+                        });
+                    };
+
+                    //  initial hide
+                    fnHideLgnum();
+
+                    //  reapply AFTER every refresh (CRITICAL)
+                    if (oTable.attachUpdateFinished) {
+                        if (oDialog._vhHideHandler) {
+                            oTable.detachUpdateFinished(oDialog._vhHideHandler);
+                        }
+
+                        oDialog._vhHideHandler = fnHideLgnum;
+                        oTable.attachUpdateFinished(oDialog._vhHideHandler);
+                    }
+
+                } catch (e) {
+                    console.log("VH patch error:", e);
                 }
 
-            } catch (e) {
-                console.log("VH patch error:", e);
-            }
-
-        }, 300);
-    };
-}
-
-
+            }, 300);
+        };
+    }
 },
 
+_resolveInputFromCell: function (oCell) {
+    if (!oCell) {
+        return null;
+    }
+
+    // SmartField case
+    if (oCell.isA && oCell.isA("sap.ui.comp.smartfield.SmartField")) {
+        var aInner = oCell.getInnerControls && oCell.getInnerControls();
+        if (aInner && aInner.length) {
+            return aInner[0];
+        }
+        return null;
+    }
+
+    // Direct input case
+    if (oCell.isA && (
+        oCell.isA("sap.m.Input") ||
+        oCell.isA("sap.m.ComboBox") ||
+        oCell.isA("sap.m.MultiInput")
+    )) {
+        return oCell;
+    }
+
+    return null;
+},
+
+
+_findColumnIndexByHeaderText: function (oTable, sHeaderContains) {
+    var aColumns = oTable.getColumns() || [];
+
+    for (var i = 0; i < aColumns.length; i++) {
+        var oHeader = aColumns[i].getHeader && aColumns[i].getHeader();
+        var sText = oHeader && oHeader.getText && oHeader.getText();
+
+        if (sText && sText.indexOf(sHeaderContains) !== -1) {
+            return i;
+        }
+    }
+
+    return -1;
+},
+
+_getCellValue: function (oCell) {
+    if (!oCell) {
+        return "";
+    }
+
+    if (oCell.getText) {
+        return oCell.getText();
+    }
+
+    if (oCell.getValue) {
+        return oCell.getValue();
+    }
+
+    if (oCell.getSelectedKey) {
+        return oCell.getSelectedKey();
+    }
+
+    return "";
+},
+
+
+_validateStorageBinInline: function (oInput, sWarehouseNo) {
+    var oModel = this.getView().getModel();
+
+    var sValue = (oInput.getValue && oInput.getValue()) || "";
+    sValue = sValue.trim();
+
+    // If the control has a selectedKey (ComboBox-like behavior), prefer it
+    if (oInput.getSelectedKey) {
+        var sKey = oInput.getSelectedKey();
+        if (sKey) {
+            sValue = sKey;
+        }
+    }
+
+    // ✅ CASE 1: empty is allowed (delete / clear)
+    if (!sValue) {
+        oInput.setValueState("None");
+        oInput.setValueStateText("");
+
+        // Force empty string into the model so backend receives clear
+        var oBinding = oInput.getBinding("value");
+        if (oBinding && oBinding.getContext()) {
+            var sFullPath = oBinding.getContext().getPath() + "/" + oBinding.getPath();
+            oModel.setProperty(sFullPath, "");
+        }
+
+        return Promise.resolve(true);
+    }
+
+    // ✅ CASE 2: validate against the VH entity
+    return new Promise(function (resolve) {
+        oModel.read("/ZEWM_I_LPTYPVH", {
+            filters: [
+                new sap.ui.model.Filter("WarehouseNo", sap.ui.model.FilterOperator.EQ, sWarehouseNo),
+                new sap.ui.model.Filter("StorageBinType", sap.ui.model.FilterOperator.EQ, sValue)
+            ],
+
+            success: function (oData) {
+                var bValid = !!(oData && oData.results && oData.results.length > 0);
+
+                if (bValid) {
+                    oInput.setValueState("None");
+                    oInput.setValueStateText("");
+                } else {
+                    oInput.setValueState("Error");
+                    oInput.setValueStateText("Invalid Storage Bin Type. Use Value Help.");
+                }
+
+                resolve(bValid);
+            },
+
+            error: function () {
+                oInput.setValueState("Error");
+                oInput.setValueStateText("Storage Bin validation failed.");
+                resolve(false);
+            }
+        });
+    });
+},
+
+
+_validateStorageBinInline: function (oInput, sWarehouseNo) {
+    var oModel = this.getView().getModel();
+
+    //  Always reset state first
+    oInput.setValueState("None");
+    oInput.setValueStateText("");
+
+    var sValue = "";
+
+    //  1. Try to read from binding (MOST IMPORTANT FIX)
+    var oBinding = oInput.getBinding("value");
+    if (oBinding && oBinding.getContext()) {
+        var sPath = oBinding.getContext().getPath() + "/" + oBinding.getPath();
+        var sModelValue = oModel.getProperty(sPath);
+        if (sModelValue) {
+            sValue = sModelValue;
+        }
+    }
+
+    //  2. Fallback to UI value
+    if (!sValue && oInput.getValue) {
+        sValue = oInput.getValue().trim();
+    }
+
+    //  3. Support ComboBox-like controls
+    if (oInput.getSelectedKey && oInput.getSelectedKey()) {
+        sValue = oInput.getSelectedKey();
+    }
+
+    //  CASE 1: empty (allowed)
+    if (!sValue) {
+
+        oInput.setValueState("None");
+        oInput.setValueStateText("");
+
+        // Force empty in model
+        if (oBinding && oBinding.getContext()) {
+            var sFullPath = oBinding.getContext().getPath() + "/" + oBinding.getPath();
+            oModel.setProperty(sFullPath, "");
+        }
+
+        return Promise.resolve(true);
+    }
+
+    //  CASE 2: validate from backend
+    return new Promise(function (resolve) {
+
+        oModel.read("/ZEWM_I_LPTYPVH", {
+            filters: [
+                new sap.ui.model.Filter("WarehouseNo", sap.ui.model.FilterOperator.EQ, sWarehouseNo),
+                new sap.ui.model.Filter("StorageBinType", sap.ui.model.FilterOperator.EQ, sValue)
+            ],
+            success: function (oData) {
+
+                var bValid = !!(oData && oData.results && oData.results.length > 0);
+
+                if (bValid) {
+                    oInput.setValueState("None");
+                    oInput.setValueStateText("");
+                } else {
+                    oInput.setValueState("Error");
+                    oInput.setValueStateText("Invalid Storage Bin Type. Use Value Help.");
+                }
+
+                resolve(bValid);
+            },
+
+            error: function () {
+                oInput.setValueState("Error");
+                oInput.setValueStateText("Storage Bin validation failed.");
+                resolve(false);
+            }
+
+        });
+
+    });
+},
+
+_wireStorageBinValidation: function () {
+    var oSmartTable = this.byId("LineItemsSmartTable");
+    var oTable = oSmartTable && oSmartTable.getTable();
+
+    if (!oTable || !oTable.getItems) {
+        return;
+    }
+
+    var iStorageIdx = this._findColumnIndexByHeaderText(oTable, "Storage Bin");
+    var iWarehouseIdx = this._findColumnIndexByHeaderText(oTable, "Warehouse");
+
+    if (iStorageIdx < 0 || iWarehouseIdx < 0) {
+        return;
+    }
+
+    oTable.getItems().forEach(function (oItem) {
+        var aCells = oItem.getCells();
+        var oStorageCell = aCells[iStorageIdx];
+        var oWarehouseCell = aCells[iWarehouseIdx];
+
+        var oInput = this._resolveInputFromCell(oStorageCell);
+        if (!oInput) {
+            return;
+        }
+
+        // avoid double attachment
+        if (oInput.data("storageBinValidationAttached")) {
+            return;
+        }
+        oInput.data("storageBinValidationAttached", true);
+
+
+oInput.attachLiveChange(function () {
+
+    setTimeout(function () {
+        var sWarehouseNo = this._getCellValue(oWarehouseCell);
+
+        this._validateStorageBinInline(oInput, sWarehouseNo);
+
+    }.bind(this), 150);
+
+}.bind(this));
+    
+oInput.attachChange(function () {
+
+    setTimeout(function () {   
+        var sWarehouseNo = this._getCellValue(oWarehouseCell);
+        this._validateStorageBinInline(oInput, sWarehouseNo);
+    }.bind(this), 150);
+
+}.bind(this));
+
+
+    }.bind(this));
+},
+
+
+_validateAllStorageBinsBeforeSave: function () {
+    var oSmartTable = this.byId("LineItemsSmartTable");
+    var oTable = oSmartTable && oSmartTable.getTable();
+
+    if (!oTable || !oTable.getItems) {
+        return true;
+    }
+
+    var iStorageIdx = this._findColumnIndexByHeaderText(oTable, "Storage Bin");
+
+    if (iStorageIdx < 0) {
+        return true;
+    }
+
+    var bAllValid = true;
+
+    oTable.getItems().forEach(function (oItem) {
+        var aCells = oItem.getCells();
+        var oStorageCell = aCells[iStorageIdx];
+
+        var oInput = this._resolveInputFromCell(oStorageCell);
+        if (!oInput) {
+            return;
+        }
+
+        if (oInput.getValueState && oInput.getValueState() === "Error") {
+            bAllValid = false;
+        }
+
+    }.bind(this));
+
+    return bAllValid;
+},
 
 _onCtrlIndicatorValueHelpRequest: function () {
     var oSFB = this.byId("smartFilterBar");
@@ -173,12 +514,12 @@ _onCtrlIndicatorValueHelpRequest: function () {
                 return;
             }
 
-            // ✅ Force SINGLE selection mode (removes checkboxes)
+            //  Force SINGLE selection mode (removes checkboxes)
             this.setSupportMultiselect(false);
             this.setSupportRanges(false);
             this.setSupportRangesOnly(false);
 
-            // ✅ Hide Warehouse column in the result table (if present)
+            //  Hide Warehouse column in the result table (if present)
             var oTable = this.getTable && this.getTable();
             if (oTable && oTable.getColumns) {
                 oTable.getColumns().forEach(function (oCol) {
@@ -190,7 +531,7 @@ _onCtrlIndicatorValueHelpRequest: function () {
                 });
             }
 
-            // ✅ When user presses OK, take the selected row and write back into SmartFilterBar
+            //  When user presses OK, take the selected row and write back into SmartFilterBar
             // (SmartFilterBar filter fields are condition-based; setFilterData is the stable write-back)
             this.detachOk(that._bpVHOkHandler); // avoid duplicates
             that._bpVHOkHandler = function (oEvent) {
@@ -229,6 +570,94 @@ _scheduleRowViewSetup: function () {
     }.bind(this), 100);
 },
 
+_applyEntitledReadOnly: function () {
+
+    // Only apply when SmartTable is in EDIT mode
+    var oSmartTable = this.byId("LineItemsSmartTable");
+    if (!oSmartTable || !oSmartTable.getEditable()) {
+        return;
+    }
+
+    var oTable = this.byId("_IDGenTable");
+    if (!oTable) {
+        return;
+    }
+
+    var aColumns = oTable.getColumns();
+    var iEntitledIndex = -1;
+
+    // Find Entitled column index safely
+    aColumns.some(function (oColumn, iIndex) {
+        var vP13nData = oColumn.data("p13nData");
+        var sLeadingProperty;
+
+        if (typeof vP13nData === "string") {
+            try {
+                sLeadingProperty = JSON.parse(vP13nData).leadingProperty;
+            } catch (e) {
+                return false;
+            }
+        } else if (vP13nData && typeof vP13nData === "object") {
+            sLeadingProperty = vP13nData.leadingProperty;
+        }
+
+        if (sLeadingProperty && sLeadingProperty.toLowerCase() === "entitled") {
+            iEntitledIndex = iIndex;
+            return true;
+        }
+
+        return false;
+    });
+
+    if (iEntitledIndex === -1) {
+        return;
+    }
+
+    // Iterate ONLY table rows (avoid dialogs!)
+    oTable.getItems().forEach(function (oItem) {
+
+        if (!oItem.isA || !oItem.isA("sap.m.ColumnListItem")) {
+            return;
+        }
+
+        var aCells = oItem.getCells();
+        if (!aCells || aCells.length <= iEntitledIndex) {
+            return;
+        }
+
+        var oCell = aCells[iEntitledIndex];
+        if (!oCell) {
+            return;
+        }
+
+        // direct SmartField
+        if (oCell.isA && oCell.isA("sap.ui.comp.smartfield.SmartField")) {
+            var oBinding = oCell.getBinding("value");
+            if (!oBinding || oBinding.getPath() !== "Entitled") {
+                return;
+            }
+
+            oCell.setEditable(false);
+            return;
+        }
+
+        // nested SmartField inside wrappers
+        if (oCell.findAggregatedObjects) {
+            var aSmartFields = oCell.findAggregatedObjects(true, function (oControl) {
+                return oControl.isA && oControl.isA("sap.ui.comp.smartfield.SmartField");
+            });
+
+            aSmartFields.forEach(function (oSmartField) {
+                var oBinding = oSmartField.getBinding("value");
+                if (!oBinding || oBinding.getPath() !== "Entitled") {
+                    return;
+                }
+
+                oSmartField.setEditable(false);
+            });
+        }
+    });
+},
 
 
         // =========================================================
@@ -965,71 +1394,130 @@ onToggleRowView: function (oEvent) {
         // =========================================================
         // EDIT / SAVE
         // =========================================================
-        onEditToggled: function () {
-            var oSmartTable = this.getView().byId("LineItemsSmartTable");
-            var aToolbarContent = oSmartTable.getToolbar().getContent();
+onEditToggled: function () {
+    var oSmartTable = this.getView().byId("LineItemsSmartTable");
+    var aToolbarContent = oSmartTable.getToolbar().getContent();
 
-            function isEditButton(oElement) {
-                try {
-                    return oElement.getProperty("accesskey") === "d";
-                } catch (e) {
-                    return false;
-                }
-            }
-
-            var oEditToggleBtn = aToolbarContent.find(isEditButton);
-
-            if (oSmartTable.getEditable()) {
-                if (oEditToggleBtn) {
-                    oEditToggleBtn.setIcon("sap-icon://save");
-                }
-            } else {
-                if (oEditToggleBtn) {
-                    oEditToggleBtn.setIcon("sap-icon://edit");
-                }
-                this.onSaveData();
-            }
-        },
-
-        onSaveData: function () {
-            var oModel = this.getView().getModel();
-            var oSmartTable = this.getView().byId("LineItemsSmartTable");
-
-            if (oModel.hasPendingChanges()) {
-                oModel.submitChanges({
-                    success: function () {
-                        sap.m.MessageToast.show(
-                            this.getView().getModel("i18n").getResourceBundle().getText("saveSuccessMessage")
-                        );
-
-                        oModel.refresh(true);
-
-                        if (oSmartTable && oSmartTable.rebindTable) {
-                            oSmartTable.rebindTable(true);
-                        }
-
-                        this._scheduleRowViewSetup();
-                    }.bind(this),
-
-                    error: function () {
-                        sap.m.MessageToast.show(
-                            this.getView().getModel("i18n").getResourceBundle().getText("saveErrorMessage")
-                        );
-
-                        if (oModel.resetChanges) {
-                            oModel.resetChanges();
-                        }
-
-                        oModel.refresh(true);
-
-                        if (oSmartTable && oSmartTable.rebindTable) {
-                            oSmartTable.rebindTable(true);
-                        }
-
-                        this._scheduleRowViewSetup();
-                    }.bind(this)
-                });
-            }
+    function isEditButton(oElement) {
+        try {
+            return oElement.getProperty("accesskey") === "d";
+        } catch (e) {
+            return false;
         }
+    }
+
+    var oEditToggleBtn = aToolbarContent.find(isEditButton);
+
+    if (oSmartTable.getEditable()) {
+        if (oEditToggleBtn) {
+            oEditToggleBtn.setIcon("sap-icon://save");
+        }
+
+        // ✅ IMPORTANT: wait for FULL binding
+        setTimeout(function () {
+            this._applyEntitledReadOnly();
+        }.bind(this), 200);
+
+    } else {
+        if (oEditToggleBtn) {
+            oEditToggleBtn.setIcon("sap-icon://edit");
+        }
+
+        this.onSaveData();
+    }
+},
+
+
+onFieldChange: function (oEvent) {
+    var oSource = oEvent.getSource();
+    var oContext = oSource.getBindingContext();
+    var oModel = this.getView().getModel();
+
+    if (!oContext) return;
+
+    var sPath = oContext.getPath();
+
+    // ✅ FORCE change registration
+    oModel.setProperty(
+        sPath + "/" + oSource.getBinding("value").getPath(),
+        oSource.getValue()
+    );
+},
+
+onAfterRendering: function () {
+    var oTable = this.byId("LineItemsSmartTable").getTable();
+
+    if (!oTable) return;
+
+    oTable.getItems().forEach(function (oItem) {
+        oItem.getCells().forEach(function (oCell) {
+            if (oCell.attachChange) {
+                oCell.attachChange(this.onFieldChange.bind(this));
+            }
+        }.bind(this));
+    }.bind(this));
+},
+
+
+onSaveData: async function () {
+    var oModel = this.getView().getModel();
+    var oSmartTable = this.getView().byId("LineItemsSmartTable");
+
+    var bValid = this._validateAllStorageBinsBeforeSave();
+
+    if (!bValid) {
+        sap.m.MessageBox.error("Please correct the invalid Storage Bin Type values before saving.");
+        return;
+    }
+
+    oModel.submitChanges({
+        success: function () {
+            sap.m.MessageToast.show(
+                this.getView().getModel("i18n").getResourceBundle().getText("saveSuccessMessage")
+            );
+
+            oModel.refresh(true);
+
+            if (oSmartTable && oSmartTable.rebindTable) {
+                oSmartTable.rebindTable(true);
+            }
+
+            this._scheduleRowViewSetup();
+
+            setTimeout(function () {
+                this._applyEntitledReadOnly();
+                this._wireStorageBinValidation();
+            }.bind(this), 200);
+
+        }.bind(this),
+
+        error: function () {
+            sap.m.MessageBox.error(
+                this.getView().getModel("i18n").getResourceBundle().getText("saveErrorMessage")
+            );
+
+            if (oModel.resetChanges) {
+                oModel.resetChanges();
+            }
+
+            oModel.refresh(true);
+
+            if (oSmartTable && oSmartTable.rebindTable) {
+                oSmartTable.rebindTable(true);
+            }
+
+            this._scheduleRowViewSetup();
+
+            setTimeout(function () {
+                this._applyEntitledReadOnly();
+                this._wireStorageBinValidation();
+            }.bind(this), 200);
+
+        }.bind(this)
+    });
+},
+
+
+
     });
 });

@@ -21,7 +21,7 @@
 <smartFilterBar:SmartFilterBar
     id="smartFilterBar"
     entitySet="ZEWM_C_MATERIAL"
-  persistencyKey="SmartTableAnalytical_Explored_V3_FILTERS4"
+  persistencyKey="SmartTableAnalytical_Explored_V4_FILTERS4"
     enableBasicSearch="true">
 
     <smartFilterBar:controlConfiguration>
@@ -119,17 +119,17 @@
                     entitySet="ZEWM_C_MATERIAL"
                     smartFilterId="smartFilterBar"
                     tableType="ResponsiveTable"
-                    enableAutoBinding="false"
+                    enableAutoBinding="true"
                     useVariantManagement="true"
                     useTablePersonalisation="true"
                     header="{i18n>smartTableHeader}"
                     initiallyVisibleFields="WarehouseNo,MaterialNumber,MaterialDesc,PutawayControl,StorSectInd,StockRemovalCtrl,BulkStorage,ProductLoadCategory,StockDeterminationGroup,RecommendedStorageQuantity,QualityInspectionGroup,MinShelfLife,ProcBlockProfile"
-                    requestAtLeastFields="MaterialId,Scuguid,EntitledId,WarehouseNo,Entitled,MaterialNumber,MaterialDesc,ProcBlockProfile"
+                  requestAtLeastFields="MaterialId,Scuguid,EntitledId,WarehouseNo,Entitled,MaterialNumber,MaterialDesc,ProcBlockProfile,CtrlIndicatorProcessType,DemandQuantity"
                     beforeRebindTable="onBeforeRebindTable"
                     enableExport="true"
                     beforeExport="onBeforeExport"
                     showRowCount="true"
-                    persistencyKey="SmartTableAnalytical_Explored_V3"
+                    persistencyKey="SmartTableAnalytical_Explored_V4"
                     class="sapUiResponsiveContentPadding"
                     enableAutoColumnWidth="true"
                     editTogglable="true"
@@ -139,8 +139,7 @@
                     app:useSmartField="true"
                     editToggled="onEditToggled"
                     placeToolbarInTable="true">
-
-                
+      
 <smartTable:customToolbar>
     <m:Toolbar id="_IDGenToolbar">
         <m:ToolbarSpacer id="_IDGenToolbarSpacer1"/>
