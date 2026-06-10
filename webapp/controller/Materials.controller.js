@@ -55,21 +55,11 @@ if (oModel) {
 
 var oTable = this.table;
 
-oTable.getItems().forEach(function (oItem) {
-    oItem.getCells().forEach(function (oCell) {
-        if (oCell.attachChange && !oCell._changeAttached) {
-            oCell.attachChange(this.onFieldChange.bind(this));
-            oCell._changeAttached = true;
-        }
-    }.bind(this));
-}.bind(this));
-
-
             if (oTable.attachUpdateFinished) {
                 oTable.attachUpdateFinished(function () {
 
                     this._scheduleRowViewSetup();
-                    this._wireStorageBinValidation();
+                    this._wireGenericVHValidation();
 
                     //  IMPORTANT: apply after full rendering
                     setTimeout(function () {
@@ -96,7 +86,7 @@ oTable.getItems().forEach(function (oItem) {
         onAfterShow: function () {
 
             this._scheduleRowViewSetup();
-            this._wireStorageBinValidation();
+            this._wireGenericVHValidation();
 
             //  IMPORTANT: ensure binding ready
             setTimeout(function () {
@@ -172,7 +162,7 @@ oTable.getItems().forEach(function (oItem) {
                             var oBinding = aCells[i].getBinding && aCells[i].getBinding("text");
                             var sPath = oBinding && oBinding.getPath && oBinding.getPath();
 
-                            // ✅ flexible detection
+                            //  flexible detection
                             if (sPath && sPath.toLowerCase().includes("lgnum")) {
                                 oCol.setVisible(false);
                             }
@@ -200,13 +190,125 @@ oTable.getItems().forEach(function (oItem) {
         };
     }
 },
+_getVhValidationConfig: function () {
+    return [
+
+        {
+            fieldPath: "StorageBinType",
+            headerText: "Storage Bin",
+            entitySet: "/ZEWM_I_LPTYPVH",
+            warehouseField: "WarehouseNo",
+            valueField: "StorageBinType",
+            message: "Invalid Storage Bin Type. Use Value Help."
+        },
+
+        {
+            fieldPath: "CtrlIndicatorProcessType",
+            headerText: "Proc.Type",
+            entitySet: "/ZEWM_I_PTDETINDVH",
+            warehouseField: "WarehouseNo",
+            valueField: "CtrlIndicatorProcessType",
+            message: "Invalid Proc.Type Det. Ind. Use Value Help."
+        },
+
+        {
+            fieldPath: "ProductLoadCategory",
+            headerText: "Prod. Load",
+            entitySet: "/ZEWM_I_WRKLDGRVH",
+            warehouseField: "WarehouseNo",
+            valueField: "ProductLoadCategory",
+            message: "Invalid Product Load Category. Use Value Help."
+        },
+
+        {
+            fieldPath: "BulkStorage",
+            headerText: "Bulk Storage",
+            entitySet: "/ZEWM_I_BULKSTORAGEVH",
+            warehouseField: "Lgnum",
+            valueField: "BLOCK",
+            message: "Invalid Bulk Storage. Use Value Help."
+        },
+
+        {
+            fieldPath: "PutawayControl",
+            headerText: "Putaway",
+            entitySet: "/ZEWM_I_PUTAWAYVH",
+            warehouseField: "Lgnum",
+            valueField: "PutStra",
+            message: "Invalid Putaway Control. Use Value Help."
+        },
+
+        {
+            fieldPath: "StorSectInd",
+            headerText: "Storage Sect",
+            entitySet: "/ZEWM_I_STORAGESECTIONVH",
+            warehouseField: "Lgnum",
+            valueField: "LGBKZ",
+            message: "Invalid Storage Section Indicator. Use Value Help."
+        },
+
+        {
+            fieldPath: "StockRemovalCtrl",
+            headerText: "Stock Rem",
+            entitySet: "/ZEWM_I_STOCKREMOVALVH",
+            warehouseField: "Lgnum",
+            valueField: "REM_STRA",
+            message: "Invalid Stock Removal Control. Use Value Help."
+        },
+
+        {
+            fieldPath: "StockDeterminationGroup",
+            headerText: "Stk Det",
+            entitySet: "/ZEWM_I_STCKDETGRVH",
+            warehouseField: "WarehouseNo",
+            valueField: "StockDeterminationGroup",
+            message: "Invalid Stock Determination Group. Use Value Help."
+        },
+
+        {
+            fieldPath: "QualityInspectionGroup",
+            headerText: "Quality",
+            entitySet: "/ZEWM_I_QGRPVH",
+            warehouseField: null,
+            valueField: "QualityInspectionGroup",
+            message: "Invalid Quality Inspection Group. Use Value Help."
+        },
+
+        {
+            fieldPath: "CycleCountingIndicator",
+            headerText: "Cyc.",
+            entitySet: "/ZEWM_I_CCINDVH",
+            warehouseField: "WarehouseNo",
+            valueField: "CycleCountingIndicator",
+            message: "Invalid Cycle Counting Indicator. Use Value Help."
+        },
+
+        {
+            fieldPath: "QuantityClassMerchandiseDistr",
+            headerText: "Quant",
+            entitySet: "/ZEWM_I_QUANCLAVH",
+            warehouseField: null,
+            valueField: "QuantityClassMerchandiseDistr",
+            message: "Invalid Quantity Classification. Use Value Help."
+        },
+
+        {
+            fieldPath: "ProcBlockProfile",
+            headerText: "Process Blo",
+            entitySet: "/ZEWM_I_PROCPRFLVH",
+            warehouseField: "WarehouseNo",
+            valueField: "ProcBlockProfile",
+            message: "Invalid Process Block Profile. Use Value Help."
+        }
+
+    ];
+},
 
 _resolveInputFromCell: function (oCell) {
     if (!oCell) {
         return null;
     }
 
-    // SmartField case
     if (oCell.isA && oCell.isA("sap.ui.comp.smartfield.SmartField")) {
         var aInner = oCell.getInnerControls && oCell.getInnerControls();
         if (aInner && aInner.length) {
@@ -215,7 +317,6 @@ _resolveInputFromCell: function (oCell) {
         return null;
     }
 
-    // Direct input case
     if (oCell.isA && (
         oCell.isA("sap.m.Input") ||
         oCell.isA("sap.m.ComboBox") ||
@@ -226,6 +327,9 @@ _resolveInputFromCell: function (oCell) {
 
     return null;
 },
+
+
+
 
 
 _findColumnIndexByHeaderText: function (oTable, sHeaderContains) {
@@ -242,6 +346,8 @@ _findColumnIndexByHeaderText: function (oTable, sHeaderContains) {
 
     return -1;
 },
+
+
 
 _getCellValue: function (oCell) {
     if (!oCell) {
@@ -264,42 +370,141 @@ _getCellValue: function (oCell) {
 },
 
 
-_validateStorageBinInline: function (oInput, sWarehouseNo) {
+onSaveData: async function () {
     var oModel = this.getView().getModel();
+    var oSmartTable = this.byId("LineItemsSmartTable");
 
+    await new Promise(function (resolve) {
+        setTimeout(resolve, 250);
+    });
+
+    var bValid = await this._validateAllConfiguredVHFieldsBeforeSave();
+
+    if (!bValid) {
+        sap.m.MessageBox.error("Fix highlighted fields before saving.");
+        return;
+    }
+
+    oModel.submitChanges({
+       onSaveData: async function () {
+    var oModel = this.getView().getModel();
+    var oSmartTable = this.byId("LineItemsSmartTable");
+
+    await new Promise(function (resolve) {
+        setTimeout(resolve, 250);
+    });
+
+    var bValid = await this._validateAllConfiguredVHFieldsBeforeSave();
+
+    if (!bValid) {
+        sap.m.MessageBox.error("Fix highlighted fields before saving.");
+        return;
+    }
+
+    oModel.submitChanges({
+        success: function () {
+            sap.m.MessageToast.show("Data successfully saved");
+
+            oModel.refresh(true);
+            if (oSmartTable && oSmartTable.rebindTable) {
+                oSmartTable.rebindTable(true);
+            }
+
+            setTimeout(function () {
+                this._wireGenericVHValidation();
+            }.bind(this), 200);
+
+        }.bind(this),
+
+        error: function () {
+            sap.m.MessageBox.error("Error during save");
+        }
+    });
+},
+
+        error: function () {
+            sap.m.MessageBox.error("Error during save");
+        }
+    });
+},
+
+
+_wireGenericVHValidation: function () {
+    var oSmartTable = this.byId("LineItemsSmartTable");
+    var oTable = oSmartTable && oSmartTable.getTable();
+    var aCfg = this._getVhValidationConfig();
+
+    if (!oTable || !oTable.getItems) {
+        return;
+    }
+
+    aCfg.forEach(function (oCfg) {
+        var iColIdx = this._findColumnIndexByHeaderText(oTable, oCfg.headerText);
+        if (iColIdx < 0) {
+            return;
+        }
+
+        oTable.getItems().forEach(function (oItem) {
+            var oCell = oItem.getCells()[iColIdx];
+            var oInput = this._resolveInputFromCell(oCell);
+
+            if (!oInput) {
+                return;
+            }
+
+            var sAttachKey = "vhValidationAttached_" + oCfg.fieldPath;
+            if (oInput.data(sAttachKey)) {
+                return;
+            }
+            oInput.data(sAttachKey, true);
+
+            oInput.attachChange(function () {
+                setTimeout(function () {
+                    var sWarehouseNo = this._getRowWarehouseNo(oItem);
+                    this._validateVHField(oInput, sWarehouseNo, oCfg);
+                }.bind(this), 200);
+            }.bind(this));
+
+        }.bind(this));
+    }.bind(this));
+},
+
+
+_validateVHField: function (oInput, sWarehouseNo, oCfg) {
+
+    var oModel = this.getView().getModel();
     var sValue = (oInput.getValue && oInput.getValue()) || "";
     sValue = sValue.trim();
 
-    // If the control has a selectedKey (ComboBox-like behavior), prefer it
-    if (oInput.getSelectedKey) {
-        var sKey = oInput.getSelectedKey();
-        if (sKey) {
-            sValue = sKey;
-        }
-    }
-
-    // ✅ CASE 1: empty is allowed (delete / clear)
+    // Empty allowed
     if (!sValue) {
         oInput.setValueState("None");
         oInput.setValueStateText("");
-
-        // Force empty string into the model so backend receives clear
-        var oBinding = oInput.getBinding("value");
-        if (oBinding && oBinding.getContext()) {
-            var sFullPath = oBinding.getContext().getPath() + "/" + oBinding.getPath();
-            oModel.setProperty(sFullPath, "");
-        }
-
         return Promise.resolve(true);
     }
 
-    // ✅ CASE 2: validate against the VH entity
     return new Promise(function (resolve) {
-        oModel.read("/ZEWM_I_LPTYPVH", {
-            filters: [
-                new sap.ui.model.Filter("WarehouseNo", sap.ui.model.FilterOperator.EQ, sWarehouseNo),
-                new sap.ui.model.Filter("StorageBinType", sap.ui.model.FilterOperator.EQ, sValue)
-            ],
+
+        var aFilters = [];
+
+        // Only add warehouse filter if configured
+        if (oCfg.warehouseField && sWarehouseNo) {
+            aFilters.push(new sap.ui.model.Filter(
+                oCfg.warehouseField,
+                sap.ui.model.FilterOperator.EQ,
+                sWarehouseNo
+            ));
+        }
+
+        // Always validate the actual code field
+        aFilters.push(new sap.ui.model.Filter(
+            oCfg.valueField,
+            sap.ui.model.FilterOperator.EQ,
+            sValue
+        ));
+
+        oModel.read(oCfg.entitySet, {
+            filters: aFilters,
 
             success: function (oData) {
                 var bValid = !!(oData && oData.results && oData.results.length > 0);
@@ -309,7 +514,7 @@ _validateStorageBinInline: function (oInput, sWarehouseNo) {
                     oInput.setValueStateText("");
                 } else {
                     oInput.setValueState("Error");
-                    oInput.setValueStateText("Invalid Storage Bin Type. Use Value Help.");
+                    oInput.setValueStateText(oCfg.message);
                 }
 
                 resolve(bValid);
@@ -317,182 +522,61 @@ _validateStorageBinInline: function (oInput, sWarehouseNo) {
 
             error: function () {
                 oInput.setValueState("Error");
-                oInput.setValueStateText("Storage Bin validation failed.");
+                oInput.setValueStateText("Validation failed.");
                 resolve(false);
             }
         });
+
     });
 },
 
 
-_validateStorageBinInline: function (oInput, sWarehouseNo) {
-    var oModel = this.getView().getModel();
 
-    //  Always reset state first
-    oInput.setValueState("None");
-    oInput.setValueStateText("");
+_validateAllConfiguredVHFieldsBeforeSave: function () {
+    var oSmartTable = this.byId("LineItemsSmartTable");
+    var oTable = oSmartTable && oSmartTable.getTable();
+    var aCfg = this._getVhValidationConfig();
 
-    var sValue = "";
-
-    //  1. Try to read from binding (MOST IMPORTANT FIX)
-    var oBinding = oInput.getBinding("value");
-    if (oBinding && oBinding.getContext()) {
-        var sPath = oBinding.getContext().getPath() + "/" + oBinding.getPath();
-        var sModelValue = oModel.getProperty(sPath);
-        if (sModelValue) {
-            sValue = sModelValue;
-        }
-    }
-
-    //  2. Fallback to UI value
-    if (!sValue && oInput.getValue) {
-        sValue = oInput.getValue().trim();
-    }
-
-    //  3. Support ComboBox-like controls
-    if (oInput.getSelectedKey && oInput.getSelectedKey()) {
-        sValue = oInput.getSelectedKey();
-    }
-
-    //  CASE 1: empty (allowed)
-    if (!sValue) {
-
-        oInput.setValueState("None");
-        oInput.setValueStateText("");
-
-        // Force empty in model
-        if (oBinding && oBinding.getContext()) {
-            var sFullPath = oBinding.getContext().getPath() + "/" + oBinding.getPath();
-            oModel.setProperty(sFullPath, "");
-        }
-
+    if (!oTable || !oTable.getItems) {
         return Promise.resolve(true);
     }
 
-    //  CASE 2: validate from backend
-    return new Promise(function (resolve) {
+    var aPromises = [];
 
-        oModel.read("/ZEWM_I_LPTYPVH", {
-            filters: [
-                new sap.ui.model.Filter("WarehouseNo", sap.ui.model.FilterOperator.EQ, sWarehouseNo),
-                new sap.ui.model.Filter("StorageBinType", sap.ui.model.FilterOperator.EQ, sValue)
-            ],
-            success: function (oData) {
+    aCfg.forEach(function (oCfg) {
+        var iColIdx = this._findColumnIndexByHeaderText(oTable, oCfg.headerText);
+        if (iColIdx < 0) {
+            return;
+        }
 
-                var bValid = !!(oData && oData.results && oData.results.length > 0);
+        oTable.getItems().forEach(function (oItem) {
+            var oCell = oItem.getCells()[iColIdx];
+            var oInput = this._resolveInputFromCell(oCell);
 
-                if (bValid) {
-                    oInput.setValueState("None");
-                    oInput.setValueStateText("");
-                } else {
-                    oInput.setValueState("Error");
-                    oInput.setValueStateText("Invalid Storage Bin Type. Use Value Help.");
-                }
-
-                resolve(bValid);
-            },
-
-            error: function () {
-                oInput.setValueState("Error");
-                oInput.setValueStateText("Storage Bin validation failed.");
-                resolve(false);
+            if (!oInput) {
+                return;
             }
 
-        });
+            var sWarehouseNo = this._getRowWarehouseNo(oItem);
+            aPromises.push(this._validateVHField(oInput, sWarehouseNo, oCfg));
+        }.bind(this));
+    }.bind(this));
 
+    return Promise.all(aPromises).then(function (aResults) {
+        return aResults.every(Boolean);
     });
 },
 
-_wireStorageBinValidation: function () {
-    var oSmartTable = this.byId("LineItemsSmartTable");
-    var oTable = oSmartTable && oSmartTable.getTable();
-
-    if (!oTable || !oTable.getItems) {
-        return;
+_getRowWarehouseNo: function (oItem) {
+    var oCtx = oItem && oItem.getBindingContext && oItem.getBindingContext();
+    if (!oCtx) {
+        return "";
     }
-
-    var iStorageIdx = this._findColumnIndexByHeaderText(oTable, "Storage Bin");
-    var iWarehouseIdx = this._findColumnIndexByHeaderText(oTable, "Warehouse");
-
-    if (iStorageIdx < 0 || iWarehouseIdx < 0) {
-        return;
-    }
-
-    oTable.getItems().forEach(function (oItem) {
-        var aCells = oItem.getCells();
-        var oStorageCell = aCells[iStorageIdx];
-        var oWarehouseCell = aCells[iWarehouseIdx];
-
-        var oInput = this._resolveInputFromCell(oStorageCell);
-        if (!oInput) {
-            return;
-        }
-
-        // avoid double attachment
-        if (oInput.data("storageBinValidationAttached")) {
-            return;
-        }
-        oInput.data("storageBinValidationAttached", true);
-
-
-oInput.attachLiveChange(function () {
-
-    setTimeout(function () {
-        var sWarehouseNo = this._getCellValue(oWarehouseCell);
-
-        this._validateStorageBinInline(oInput, sWarehouseNo);
-
-    }.bind(this), 150);
-
-}.bind(this));
-    
-oInput.attachChange(function () {
-
-    setTimeout(function () {   
-        var sWarehouseNo = this._getCellValue(oWarehouseCell);
-        this._validateStorageBinInline(oInput, sWarehouseNo);
-    }.bind(this), 150);
-
-}.bind(this));
-
-
-    }.bind(this));
+    return oCtx.getProperty("WarehouseNo") || "";
 },
 
 
-_validateAllStorageBinsBeforeSave: function () {
-    var oSmartTable = this.byId("LineItemsSmartTable");
-    var oTable = oSmartTable && oSmartTable.getTable();
 
-    if (!oTable || !oTable.getItems) {
-        return true;
-    }
-
-    var iStorageIdx = this._findColumnIndexByHeaderText(oTable, "Storage Bin");
-
-    if (iStorageIdx < 0) {
-        return true;
-    }
-
-    var bAllValid = true;
-
-    oTable.getItems().forEach(function (oItem) {
-        var aCells = oItem.getCells();
-        var oStorageCell = aCells[iStorageIdx];
-
-        var oInput = this._resolveInputFromCell(oStorageCell);
-        if (!oInput) {
-            return;
-        }
-
-        if (oInput.getValueState && oInput.getValueState() === "Error") {
-            bAllValid = false;
-        }
-
-    }.bind(this));
-
-    return bAllValid;
-},
 
 _onCtrlIndicatorValueHelpRequest: function () {
     var oSFB = this.byId("smartFilterBar");
@@ -738,13 +822,17 @@ _isExistingWarehouseCombination: function (sMaterialId, sWarehouseNo, sEntitled)
             this.oInfoMessageDialog.open();
         },
 
-        // =========================================================
-        // SMARTTABLE BINDING
-        // =========================================================
-        onBeforeRebindTable: function () {
-            // Keep minimal and stable.
-            // requestAtLeastFields is handled in XML.
-        },
+      onBeforeRebindTable: function (oEvent) {
+
+    var oBindingParams = oEvent.getParameter("bindingParams");
+
+    //  disable $skip cache behavior
+    oBindingParams.parameters = oBindingParams.parameters || {};
+    oBindingParams.parameters["$top"] = 1000;
+
+    //  FORCE new request (important)
+    oBindingParams.preventTableBind = false;
+},
 
         // =========================================================
         // CREATE ASSIGNMENT
@@ -786,7 +874,7 @@ _isExistingWarehouseCombination: function (sMaterialId, sWarehouseNo, sEntitled)
             }
         },
 
-       
+
 
 onCreateWarehouse: function () {
     var oModel = this.getView().getModel();
@@ -1426,97 +1514,6 @@ onEditToggled: function () {
         this.onSaveData();
     }
 },
-
-
-onFieldChange: function (oEvent) {
-    var oSource = oEvent.getSource();
-    var oContext = oSource.getBindingContext();
-    var oModel = this.getView().getModel();
-
-    if (!oContext) return;
-
-    var sPath = oContext.getPath();
-
-    // ✅ FORCE change registration
-    oModel.setProperty(
-        sPath + "/" + oSource.getBinding("value").getPath(),
-        oSource.getValue()
-    );
-},
-
-onAfterRendering: function () {
-    var oTable = this.byId("LineItemsSmartTable").getTable();
-
-    if (!oTable) return;
-
-    oTable.getItems().forEach(function (oItem) {
-        oItem.getCells().forEach(function (oCell) {
-            if (oCell.attachChange) {
-                oCell.attachChange(this.onFieldChange.bind(this));
-            }
-        }.bind(this));
-    }.bind(this));
-},
-
-
-onSaveData: async function () {
-    var oModel = this.getView().getModel();
-    var oSmartTable = this.getView().byId("LineItemsSmartTable");
-
-    var bValid = this._validateAllStorageBinsBeforeSave();
-
-    if (!bValid) {
-        sap.m.MessageBox.error("Please correct the invalid Storage Bin Type values before saving.");
-        return;
-    }
-
-    oModel.submitChanges({
-        success: function () {
-            sap.m.MessageToast.show(
-                this.getView().getModel("i18n").getResourceBundle().getText("saveSuccessMessage")
-            );
-
-            oModel.refresh(true);
-
-            if (oSmartTable && oSmartTable.rebindTable) {
-                oSmartTable.rebindTable(true);
-            }
-
-            this._scheduleRowViewSetup();
-
-            setTimeout(function () {
-                this._applyEntitledReadOnly();
-                this._wireStorageBinValidation();
-            }.bind(this), 200);
-
-        }.bind(this),
-
-        error: function () {
-            sap.m.MessageBox.error(
-                this.getView().getModel("i18n").getResourceBundle().getText("saveErrorMessage")
-            );
-
-            if (oModel.resetChanges) {
-                oModel.resetChanges();
-            }
-
-            oModel.refresh(true);
-
-            if (oSmartTable && oSmartTable.rebindTable) {
-                oSmartTable.rebindTable(true);
-            }
-
-            this._scheduleRowViewSetup();
-
-            setTimeout(function () {
-                this._applyEntitledReadOnly();
-                this._wireStorageBinValidation();
-            }.bind(this), 200);
-
-        }.bind(this)
-    });
-},
-
 
 
     });
