@@ -299,7 +299,27 @@ _getVhValidationConfig: function () {
             warehouseField: "WarehouseNo",
             valueField: "ProcBlockProfile",
             message: "Invalid Process Block Profile. Use Value Help."
-        }
+        },
+
+
+{
+            fieldPath: "WeightIndicator",
+            headerText: "Weight",
+            entitySet: "/ZEWM_I_WEIGHTINDVH",
+            warehouseField: "Lgnum",
+            valueField: "WeightIndicator",
+            message: "Invalid Weight Indicator. Use Value Help."
+        },
+
+ {
+            fieldPath: "VolumeIndicator",
+            headerText: "Volume",
+            entitySet: "/ZEWM_I_VOLUMEINDVH",
+            warehouseField: "Lgnum",
+            valueField: "VolumeIndicator",
+            message: "Invalid Volume Indicator. Use Value Help."
+        },
+
 
     ];
 },
