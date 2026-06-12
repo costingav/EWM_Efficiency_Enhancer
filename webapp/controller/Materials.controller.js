@@ -420,10 +420,12 @@ onSaveData: async function () {
         return false;
     }
 
-    if (!oModel.hasPendingChanges()) {
-        sap.m.MessageBox.information("No changes to save.");
-        return true;
-    }
+    
+if (!oModel.hasPendingChanges()) {
+    console.log("No changes to save - skipping");
+    return true;
+}
+
 console.log("Pending changes =", oModel.hasPendingChanges());
 
     
@@ -503,23 +505,31 @@ _wireGenericVHValidation: function () {
             oInput.data(sAttachKey, true);
 
             //  SAFE attachChange
-            if (oInput.attachChange) {
+           
+if (oInput && (oInput.attachChange || oInput.attachLiveChange)) {
 
-                oInput.attachChange(function () {
+    var fnHandler = function () {
 
-                    setTimeout(function () {
+        setTimeout(function () {
 
-                        var sWarehouseNo = this._getRowWarehouseNo(oItem);
+            var sWarehouseNo = this._getRowWarehouseNo(oItem);
 
-                        console.log("Change detected for:", oCfg.fieldPath);
+            console.log("Change detected for:", oCfg.fieldPath);
 
-                        this._validateVHField(oInput, sWarehouseNo, oCfg);
+            this._validateVHField(oInput, sWarehouseNo, oCfg);
 
-                    }.bind(this), 200);
+        }.bind(this), 200);
+    }.bind(this);
 
-                }.bind(this));
+    if (oInput.attachChange) {
+        oInput.attachChange(fnHandler);
+    }
 
-            }
+    if (oInput.attachLiveChange) {
+        oInput.attachLiveChange(fnHandler);
+    }
+}
+
             //  fallback for controls without attachChange
             else if (oInput.attachLiveChange) {
 
@@ -663,7 +673,15 @@ _validateAllConfiguredVHFieldsBeforeSave: function () {
     }.bind(this));
 
     return Promise.all(aPromises).then(function (aResults) {
-        return aResults.every(Boolean);
+        
+var bAllValid = aResults.every(Boolean);
+
+if (!bAllValid) {
+    console.log("Validation failed - preventing submit");
+}
+
+return bAllValid;
+
     });
 },
 
