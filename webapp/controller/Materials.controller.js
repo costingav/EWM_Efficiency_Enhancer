@@ -29,6 +29,48 @@ if (oModel) {
     var oSmartTable = oView.byId("LineItemsSmartTable");
     var oSmartFilterBar = oView.byId("smartFilterBar");
 
+
+if (oSmartFilterBar) {
+    oSmartFilterBar.attachSearch(function () {
+
+        var aInvalidFields = [];
+
+        oSmartFilterBar.getAllFilterItems().forEach(function (oItem) {
+
+            var oControl = oItem.getControl();
+            if (!oControl) {
+                return;
+            }
+
+            var sValue = "";
+
+            if (oControl.getValue) {
+                sValue = oControl.getValue();
+            } else if (oControl.getSelectedKey) {
+                sValue = oControl.getSelectedKey();
+            }
+
+            //  check invalid length (generic safety)
+            if (sValue && sValue.length > 4) {
+                oControl.setValue("");
+                oControl.setSelectedKey && oControl.setSelectedKey("");
+
+                aInvalidFields.push(oItem.getLabel());
+            }
+
+        });
+
+        //  User feedback (clean UX)
+        if (aInvalidFields.length > 0) {
+            sap.m.MessageToast.show(
+                "Some filters were cleared because of invalid values."
+            );
+        }
+
+    }.bind(this));
+}
+
+
     // ===============================
     // View model
     // ===============================
@@ -45,6 +87,10 @@ if (oModel) {
         var oTable = oSmartTable.getTable();
         this.table = oTable;
 
+this.getView().byId("_IDGenButton").setEnabled(false);
+this.getView().byId("_MassChange").setEnabled(false);
+
+
         if (oTable) {
 
             if (oTable.isA("sap.m.Table")) {
@@ -56,17 +102,25 @@ if (oModel) {
 var oTable = this.table;
 
             if (oTable.attachUpdateFinished) {
-                oTable.attachUpdateFinished(function () {
+                
+oTable.attachUpdateFinished(function () {
 
-                    this._scheduleRowViewSetup();
-                    this._wireGenericVHValidation();
+    this._scheduleRowViewSetup();
+    this._wireGenericVHValidation();
 
-                    //  IMPORTANT: apply after full rendering
-                    setTimeout(function () {
-                        this._applyEntitledReadOnly();
-                    }.bind(this), 200);
+    setTimeout(function () {
+        this._applyEntitledReadOnly();
+    }.bind(this), 200);
 
-                }.bind(this));
+   
+    if (this.table && this.table.removeSelections) {
+        this.table.removeSelections(true);
+    }
+
+    this.onTableSelectionChange();
+
+}.bind(this));
+
             }
         }
 
@@ -84,6 +138,10 @@ var oTable = this.table;
     // ===============================
     oView.addEventDelegate({
         onAfterShow: function () {
+
+if (oSmartFilterBar) {
+    oSmartFilterBar.clear();
+}
 
             this._scheduleRowViewSetup();
             this._wireGenericVHValidation();
@@ -206,7 +264,7 @@ _getVhValidationConfig: function () {
             fieldPath: "CtrlIndicatorProcessType",
             headerText: "Proc.Type Det.",
             entitySet: "/ZEWM_I_PTDETINDVH",
-            warehouseField: "WarehouseNo",
+            warehouseField: "Lgnum",
             valueField: "CtrlIndicatorProcessType",
             message: "Invalid Proc.Type Det. Ind. Use Value Help."
         },
@@ -324,6 +382,19 @@ _getVhValidationConfig: function () {
     ];
 },
 
+_forceTableRefresh: function () {
+    var oSmartTable = this.byId("LineItemsSmartTable");
+    var oModel = this.getView().getModel();
+
+    if (oModel) {
+        oModel.refresh(true); // force backend reload
+    }
+
+    if (oSmartTable && oSmartTable.rebindTable) {
+        oSmartTable.rebindTable(true);
+    }
+},
+
 _resolveInputFromCell: function (oCell) {
 
     if (!oCell) {
@@ -433,7 +504,7 @@ oModel.submitChanges({
 
     success: function (oResponse) {
 
-        // ❗ check for backend errors
+        //check for backend errors
         if (oResponse && oResponse.__batchResponses) {
 
             var bHasError = oResponse.__batchResponses.some(function (oBatch) {
@@ -610,11 +681,15 @@ success: function (oData) {
 
     var bValid = !!(oData && oData.results && oData.results.length > 0);
 
-    // ✅ ALWAYS push value to model (CRITICAL FIX)
-    var oBinding = oInput && oInput.getBinding && oInput.getBinding("value");
-    if (oBinding) {
-        oBinding.setValue(sValue);
-    }
+    //  ALWAYS push value to model (CRITICAL FIX)
+  
+var oCtx = oInput.getBindingContext();
+var sPath = oInput.getBinding("value")?.getPath();
+
+if (oCtx && sPath) {
+    this.getView().getModel().setProperty(sPath, sValue, oCtx);
+}
+
 
     if (bValid) {
 
@@ -674,7 +749,16 @@ _validateAllConfiguredVHFieldsBeforeSave: function () {
 
     return Promise.all(aPromises).then(function (aResults) {
         
-var bAllValid = aResults.every(Boolean);
+
+var bAllValid = true;
+
+aResults.forEach(function (bValid, index) {
+    if (!bValid) {
+        console.log("Invalid field detected in validation index:", index);
+        bAllValid = false;
+    }
+});
+
 
 if (!bAllValid) {
     console.log("Validation failed - preventing submit");
@@ -865,42 +949,78 @@ _applyEntitledReadOnly: function () {
         // =========================================================
         // TABLE SELECTION
         // =========================================================
-   onTableSelectionChange: function () {
-    var aSelectedItems = this.table ? this.table.getSelectedItems() : [],
-        bMassChange = true,
-        that = this;
 
-    // ---------------------------------------------------------
+onTableSelectionChange: function () {
+
+    var aSelectedItems = this.table ? this.table.getSelectedItems() : [];
+
+    //  default = both buttons disabled
+    var bCreate = false;
+    var bMassChange = false;
+
+    // No selection -> keep both disabled
+    if (!aSelectedItems.length) {
+        this.getView().byId("_IDGenButton").setEnabled(false);
+        this.getView().byId("_MassChange").setEnabled(false);
+        return;
+    }
+
+    var sWarehouse = aSelectedItems[0].getBindingContext().getObject().WarehouseNo || "";
+
+    var bAllEmpty = true;
+    var bAllExtended = true;
+    var bAllSameWarehouse = true;
+
+    aSelectedItems.forEach(function (oItem) {
+        var oObj = oItem.getBindingContext().getObject();
+        var sRowWarehouse = oObj.WarehouseNo || "";
+
+        // for CREATE logic
+        if (sRowWarehouse) {
+            bAllEmpty = false;
+        } else {
+            bAllExtended = false;
+        }
+
+        // for MASS CHANGE logic
+        if (sRowWarehouse !== sWarehouse) {
+            bAllSameWarehouse = false;
+        }
+    });
+
+    // ------------------------------------------------
     // CREATE
-    // Safe first rule:
-    // Enable Create when exactly ONE row is selected,
-    // regardless of whether WarehouseNo is blank or filled.
-    // This allows:
-    // - creating first warehouse assignment
-    // - creating additional warehouse/entitled combinations
-    // ---------------------------------------------------------
-    var bCreate = (aSelectedItems.length === 1);
+    // keep current business behavior you implemented:
+    // enabled only when all selected rows are NOT extended
+    // ------------------------------------------------
+    if (bAllEmpty) {
+        bCreate = true;
+    }
 
-    // ---------------------------------------------------------
+    // ------------------------------------------------
     // MASS CHANGE
-    // Only for same warehouse and more than one row
-    // ---------------------------------------------------------
-    if (aSelectedItems.length > 0) {
-        var sPrevWarehouse = aSelectedItems[0].getBindingContext().getObject().WarehouseNo;
+    // enabled only when:
+    // - at least 2 rows are selected
+    // - all are already extended
+    // - all belong to the same warehouse
+    // ------------------------------------------------
+    if (aSelectedItems.length > 1 && bAllExtended && bAllSameWarehouse) {
+        bMassChange = true;
+    }
 
-        aSelectedItems.forEach(function (oItem) {
-            var oObj = oItem.getBindingContext().getObject();
-
-            if (oObj.WarehouseNo !== "" && oObj.WarehouseNo !== sPrevWarehouse) {
-                bMassChange = false;
-                that.messageInformationDialog();
-            }
-        });
+    // ------------------------------------------------
+    // show message if multiple extended rows from different warehouses
+    // ------------------------------------------------
+    if (aSelectedItems.length > 1 && bAllExtended && !bAllSameWarehouse) {
+        this.messageInformationDialog();
     }
 
     this.getView().byId("_IDGenButton").setEnabled(bCreate);
-    this.getView().byId("_MassChange").setEnabled(aSelectedItems.length > 1 && bMassChange === true);
+    this.getView().byId("_MassChange").setEnabled(bMassChange);
 },
+
+
+
 
 _isExistingWarehouseCombination: function (sMaterialId, sWarehouseNo, sEntitled) {
     var aItems = this.table ? this.table.getItems() : [];
@@ -955,24 +1075,34 @@ _isExistingWarehouseCombination: function (sMaterialId, sWarehouseNo, sEntitled)
         // =========================================================
         // CREATE ASSIGNMENT
         // =========================================================
-        onCreate: function () {
-            var that = this;
+        
+onCreate: function () {
+    var that = this;
 
-            if (!this.oDialog) {
-                this.loadFragment({
-                    name: "bearingpoint.ewm.materialmaintenance.view.fragments.Create"
-                }).then(function (oDialog) {
-                    that.oContextNewEntry = that.createNewEntry();
-                    that.getView().byId("sfCreate").setBindingContext(that.oContextNewEntry);
-                    that.oDialog = oDialog;
-                    oDialog.open();
-                });
-            } else {
-                that.oContextNewEntry = that.createNewEntry();
-                that.getView().byId("sfCreate").setBindingContext(that.oContextNewEntry);
-                this.oDialog.open();
-            }
-        },
+    if (!this.oDialog) {
+        this.loadFragment({
+            name: "bearingpoint.ewm.materialmaintenance.view.fragments.Create"
+        }).then(function (oDialog) {
+
+            //  Always recreate template fresh
+            that.oContextNewEntry = that.createNewEntry();
+
+            that.getView().byId("sfCreate").setBindingContext(that.oContextNewEntry);
+
+            that.oDialog = oDialog;
+            oDialog.open();
+        });
+    } else {
+
+        //  recreate EVERY TIME dialog is opened
+        this.oContextNewEntry = this.createNewEntry();
+
+        this.getView().byId("sfCreate").setBindingContext(this.oContextNewEntry);
+
+        this.oDialog.open();
+    }
+},
+
 
         onChangeWH: function () {
             var sWarehouseNo = this.getView().byId("warehouseNo").getValue();
@@ -993,48 +1123,182 @@ _isExistingWarehouseCombination: function (sMaterialId, sWarehouseNo, sEntitled)
         },
 
 
-
 onCreateWarehouse: function () {
     var oModel = this.getView().getModel();
-    var oDialogObject = oModel.getProperty(this.oContextNewEntry.sPath);
     var oSmartTable = this.getView().byId("LineItemsSmartTable");
+    var aSelectedItems = this.table ? this.table.getSelectedItems() : [];
 
+    
+if (!this.oContextNewEntry) {
+    console.log("Recreating missing template...");
+    this.oContextNewEntry = this.createNewEntry();
+}
+
+
+    var oDialogObject = oModel.getProperty(this.oContextNewEntry.sPath);
+
+    // --------------------------------------------
+    // 1) Mandatory fields from dialog
+    // --------------------------------------------
     if (!oDialogObject.WarehouseNo || this.getView().byId("warehouseNo").getValue() === "") {
         this.getView().byId("warehouseNo").setValueState(sap.ui.core.ValueState.Error);
         return;
+    } else {
+        this.getView().byId("warehouseNo").setValueState(sap.ui.core.ValueState.None);
     }
 
     if (!oDialogObject.Entitled || this.getView().byId("entitled").getValue() === "") {
         this.getView().byId("entitled").setValueState(sap.ui.core.ValueState.Error);
         return;
+    } else {
+        this.getView().byId("entitled").setValueState(sap.ui.core.ValueState.None);
     }
 
     // Quantity requires UoM
-    if (this._hasMeaningfulMassChangeValue &&
+    if (
+        this._hasMeaningfulMassChangeValue &&
         this._hasMeaningfulMassChangeValue(oDialogObject.RecommendedStorageQuantity, "RecommendedStorageQuantity") &&
-        !this._hasMeaningfulMassChangeValue(oDialogObject.PrefferedAltUoMforWarehouseOp, "PrefferedAltUoMforWarehouseOp")) {
+        !this._hasMeaningfulMassChangeValue(oDialogObject.PrefferedAltUoMforWarehouseOp, "PrefferedAltUoMforWarehouseOp")
+    ) {
         sap.m.MessageToast.show("Preferred UoM is required when Recommended Storage Quantity is filled.");
         return;
     }
 
-    // Duplicate check: do not create if combination already exists
-    if (this._isExistingWarehouseCombination(
-        oDialogObject.MaterialId,
-        oDialogObject.WarehouseNo,
-        oDialogObject.Entitled
-    )) {
-        sap.m.MessageToast.show("This Warehouse / Entitled combination already exists for the selected material.");
+    if (!aSelectedItems.length) {
+        sap.m.MessageBox.error("No materials selected.");
         return;
     }
 
-    console.log("FINAL CREATE PAYLOAD =", oModel.getProperty(this.oContextNewEntry.sPath));
+    // --------------------------------------------
+    // 2) Keep dialog values before deleting temp row
+    // --------------------------------------------
+    var oTemplate = Object.assign({}, oDialogObject);
 
+    // remove the temporary dialog entry so it does not get submitted as a single fake create
+    this.deleteModelEntry(this.oContextNewEntry);
+    this.oContextNewEntry = null;
+
+    var iCreated = 0;
+    var iSkipped = 0;
+
+    // --------------------------------------------
+    // 3) Create one real entry per selected row
+    // --------------------------------------------
+    aSelectedItems.forEach(function (oItem) {
+        var oSource = oItem.getBindingContext().getObject();
+
+if (this._isExistingWarehouseCombination(
+    oSource.MaterialId,
+    oTemplate.WarehouseNo,
+    oTemplate.Entitled
+)) {
+    iSkipped++;
+    return;
+}
+
+        oModel.createEntry("/ZEWM_C_MATERIAL", {
+            properties: {
+                // identity from selected source row
+                MaterialId: oSource.MaterialId || "",
+                MaterialNumber: oSource.MaterialNumber || "",
+                MaterialDesc: oSource.MaterialDesc || "",
+
+                // target combination from dialog
+                WarehouseNo: oTemplate.WarehouseNo || "",
+                Entitled: oTemplate.Entitled || "",
+
+                // keep source GUIDs if present, else fallback zero GUID
+               
+EntitledId: oSource.EntitledId || "",
+Scuguid: oSource.Scuguid || "",
+
+
+                // values from dialog template (apply same entered values to all selected materials)
+                PutawayControl: oTemplate.PutawayControl || "",
+                StorSectInd: oTemplate.StorSectInd || "",
+                StockRemovalCtrl: oTemplate.StockRemovalCtrl || "",
+                BulkStorage: oTemplate.BulkStorage || "",
+
+                ProcBlockProfile: oTemplate.ProcBlockProfile || "",
+                CtrlIndicatorProcessType: oTemplate.CtrlIndicatorProcessType || "",
+                ProductLoadCategory: oTemplate.ProductLoadCategory || "",
+                CycleCountingIndicator: oTemplate.CycleCountingIndicator || "",
+
+                MinShelfLife: oTemplate.MinShelfLife || 0,
+                QuantityClassMerchandiseDistr: oTemplate.QuantityClassMerchandiseDistr || "",
+                PrefferedAltUoMforWarehouseOp: oTemplate.PrefferedAltUoMforWarehouseOp || "",
+                QualityInspectionGroup: oTemplate.QualityInspectionGroup || "",
+                StorageBinType: oTemplate.StorageBinType || "",
+                StockDeterminationGroup: oTemplate.StockDeterminationGroup || "",
+                RelevanceForTwoStepPicking: oTemplate.RelevanceForTwoStepPicking || "",
+                StagingAreaDoorDetGroup: oTemplate.StagingAreaDoorDetGroup || "",
+
+                NumberOfSalesOrderItems: oTemplate.NumberOfSalesOrderItems || 0,
+            
+               
+
+                DimentioRatio: oTemplate.DimentioRatio || 0,
+                WeightIndicator: oTemplate.WeightIndicator || "",
+                VolumeIndicator: oTemplate.VolumeIndicator || "",
+                LengthIndicator: oTemplate.LengthIndicator || "",
+                WidthIndicator: oTemplate.WidthIndicator || "",
+                HeightIndicator: oTemplate.HeightIndicator || ""
+            }
+        });
+
+        iCreated++;
+    }.bind(this));
+
+    // --------------------------------------------
+    // 4) Nothing to create
+    // --------------------------------------------
+    if (iCreated === 0) {
+        sap.m.MessageToast.show("All selected materials already exist for this Warehouse / Entitled combination.");
+        oModel.refresh(true);
+        return;
+    }
+
+    console.log("CREATE TEMPLATE =", oTemplate);
+    console.log("Created entries =", iCreated, "Skipped duplicates =", iSkipped);
+    console.log("Pending changes =", oModel.hasPendingChanges());
+    // --------------------------------------------
+    // 5) Submit all created entries
+    // --------------------------------------------
     oModel.submitChanges({
-        success: function () {
-            sap.m.MessageToast.show("Warehouse assignment created successfully");
+        success: function (oResponse) {
+
+            var bHasError = false;
+
+            if (oResponse && oResponse.__batchResponses) {
+                bHasError = oResponse.__batchResponses.some(function (oBatch) {
+                    if (oBatch.__changeResponses) {
+                        return oBatch.__changeResponses.some(function (oChange) {
+                            return oChange.response && parseInt(oChange.response.statusCode, 10) >= 400;
+                        });
+                    }
+                    return oBatch.response && parseInt(oBatch.response.statusCode, 10) >= 400;
+                });
+            }
+
+            if (bHasError) {
+                sap.m.MessageBox.error("Error creating warehouse assignment.");
+                oModel.refresh(true);
+                if (oSmartTable && oSmartTable.rebindTable) {
+                    oSmartTable.rebindTable(true);
+                }
+                return;
+            }
 
             if (this.oDialog) {
                 this.oDialog.close();
+            }
+
+            if (iSkipped > 0) {
+                sap.m.MessageToast.show(
+                    "Warehouse assignments created: " + iCreated + ". Skipped existing combinations: " + iSkipped + "."
+                );
+            } else {
+                sap.m.MessageToast.show("Warehouse assignments created successfully: " + iCreated);
             }
 
             oModel.refresh(true);
@@ -1049,11 +1313,11 @@ onCreateWarehouse: function () {
 
             this.getView().byId("_IDGenButton").setEnabled(false);
             this.getView().byId("_MassChange").setEnabled(false);
-            this.oContextNewEntry = null;
+
         }.bind(this),
 
         error: function () {
-            sap.m.MessageToast.show("Error creating warehouse assignment");
+            sap.m.MessageBox.error("Error creating warehouse assignment.");
 
             if (oModel.resetChanges) {
                 oModel.resetChanges();
@@ -1067,6 +1331,7 @@ onCreateWarehouse: function () {
         }.bind(this)
     });
 },
+
 
         closeCreateDialog: function () {
             var oModel = this.getView().getModel();
@@ -1135,7 +1400,8 @@ onCreateWarehouse: function () {
                     WeightIndicator: val(oFirstItemContext.getProperty("WeightIndicator")),
                     VolumeIndicator: val(oFirstItemContext.getProperty("VolumeIndicator")),
                     WidthIndicator: val(oFirstItemContext.getProperty("WidthIndicator")),
-                    HeightIndicator: val(oFirstItemContext.getProperty("HeightIndicator"))
+                    HeightIndicator: val(oFirstItemContext.getProperty("HeightIndicator")),
+                    LengthIndicator: val(oFirstItemContext.getProperty("LengthIndicator")),
                 }
             });
         },
@@ -1308,6 +1574,8 @@ onCreateFieldChange: function (oEvent) {
             }
 
             this.onSaveData();
+            this._validateAllConfiguredVHFieldsBeforeSave();    
+
         },
 
         _createMassChangeEntry: function () {
@@ -1641,20 +1909,29 @@ onEditToggled: function () {
         //  IMPORTANT: delay save to allow model update
         setTimeout(function () {
 
-            this.onSaveData().then(function (bSuccess) {
+            
+this.onSaveData().then(function (bSuccess) {
 
-                if (!bSuccess) {
-                    // ❗ stay in edit mode if validation failed
-                    oSmartTable.setEditable(true);
+    if (bSuccess) {
+        //  exit edit mode properly
+        oSmartTable.setEditable(false);
 
-                    if (oEditToggleBtn) {
-                        oEditToggleBtn.setIcon("sap-icon://save");
-                    }
-                }
+        if (oEditToggleBtn) {
+            oEditToggleBtn.setIcon("sap-icon://edit");
+        }
+    } else {
+        // ❗ stay in edit mode
+        oSmartTable.setEditable(true);
 
-            }.bind(this));
+        if (oEditToggleBtn) {
+            oEditToggleBtn.setIcon("sap-icon://save");
+        }
+    }
 
-        }.bind(this), 300); // 👈 key fix
+}.bind(this));
+
+
+        }.bind(this), 300); 
 
     }
 },
