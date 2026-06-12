@@ -204,7 +204,7 @@ _getVhValidationConfig: function () {
 
         {
             fieldPath: "CtrlIndicatorProcessType",
-            headerText: "Proc.Type",
+            headerText: "Proc.Type Det.",
             entitySet: "/ZEWM_I_PTDETINDVH",
             warehouseField: "WarehouseNo",
             valueField: "CtrlIndicatorProcessType",
@@ -231,7 +231,7 @@ _getVhValidationConfig: function () {
 
         {
             fieldPath: "PutawayControl",
-            headerText: "Putaway",
+            headerText: "Putaway Control",
             entitySet: "/ZEWM_I_PUTAWAYVH",
             warehouseField: "Lgnum",
             valueField: "PutStra",
@@ -249,7 +249,7 @@ _getVhValidationConfig: function () {
 
         {
             fieldPath: "StockRemovalCtrl",
-            headerText: "Stock Rem",
+            headerText: "Stock Removal",
             entitySet: "/ZEWM_I_STOCKREMOVALVH",
             warehouseField: "Lgnum",
             valueField: "REM_STRA",
@@ -258,7 +258,7 @@ _getVhValidationConfig: function () {
 
         {
             fieldPath: "StockDeterminationGroup",
-            headerText: "Stk Det",
+            headerText: "Stk Det. Group",
             entitySet: "/ZEWM_I_STCKDETGRVH",
             warehouseField: "WarehouseNo",
             valueField: "StockDeterminationGroup",
@@ -267,7 +267,7 @@ _getVhValidationConfig: function () {
 
         {
             fieldPath: "QualityInspectionGroup",
-            headerText: "Quality",
+            headerText: "Quality Insp.",
             entitySet: "/ZEWM_I_QGRPVH",
             warehouseField: null,
             valueField: "QualityInspectionGroup",
@@ -276,7 +276,7 @@ _getVhValidationConfig: function () {
 
         {
             fieldPath: "CycleCountingIndicator",
-            headerText: "Cyc.",
+            headerText: "Cyc.Count Ind.",
             entitySet: "/ZEWM_I_CCINDVH",
             warehouseField: "WarehouseNo",
             valueField: "CycleCountingIndicator",
@@ -285,7 +285,7 @@ _getVhValidationConfig: function () {
 
         {
             fieldPath: "QuantityClassMerchandiseDistr",
-            headerText: "Quant",
+            headerText: "Quant Class.",
             entitySet: "/ZEWM_I_QUANCLAVH",
             warehouseField: null,
             valueField: "QuantityClassMerchandiseDistr",
@@ -294,7 +294,7 @@ _getVhValidationConfig: function () {
 
         {
             fieldPath: "ProcBlockProfile",
-            headerText: "Process Blo",
+            headerText: "Process Block",
             entitySet: "/ZEWM_I_PROCPRFLVH",
             warehouseField: "WarehouseNo",
             valueField: "ProcBlockProfile",
@@ -304,7 +304,7 @@ _getVhValidationConfig: function () {
 
 {
             fieldPath: "WeightIndicator",
-            headerText: "Weight",
+            headerText: "Weight Indicator",
             entitySet: "/ZEWM_I_WEIGHTINDVH",
             warehouseField: "Lgnum",
             valueField: "WeightIndicator",
@@ -313,7 +313,7 @@ _getVhValidationConfig: function () {
 
  {
             fieldPath: "VolumeIndicator",
-            headerText: "Volume",
+            headerText: "Volume Indicator",
             entitySet: "/ZEWM_I_VOLUMEINDVH",
             warehouseField: "Lgnum",
             valueField: "VolumeIndicator",
@@ -325,30 +325,45 @@ _getVhValidationConfig: function () {
 },
 
 _resolveInputFromCell: function (oCell) {
+
     if (!oCell) {
         return null;
     }
 
+    // SmartField → extract inner control
     if (oCell.isA && oCell.isA("sap.ui.comp.smartfield.SmartField")) {
         var aInner = oCell.getInnerControls && oCell.getInnerControls();
         if (aInner && aInner.length) {
-            return aInner[0];
+            return aInner[0]; //  this is the real input
         }
-        return null;
     }
 
-    if (oCell.isA && (
-        oCell.isA("sap.m.Input") ||
-        oCell.isA("sap.m.ComboBox") ||
-        oCell.isA("sap.m.MultiInput")
-    )) {
+    // Direct input types
+    if (
+        oCell.isA && (
+            oCell.isA("sap.m.Input") ||
+            oCell.isA("sap.m.ComboBox") ||
+            oCell.isA("sap.m.MultiInput")
+        )
+    ) {
         return oCell;
+    }
+
+    // fallback: try aggregated objects
+    if (oCell.findAggregatedObjects) {
+        var aInputs = oCell.findAggregatedObjects(true, function (oControl) {
+            return oControl.isA && (
+                oControl.isA("sap.m.Input") ||
+                oControl.isA("sap.m.ComboBox") ||
+                oControl.isA("sap.m.MultiInput")
+            );
+        });
+
+        return aInputs.length ? aInputs[0] : null;
     }
 
     return null;
 },
-
-
 
 
 
@@ -402,54 +417,55 @@ onSaveData: async function () {
 
     if (!bValid) {
         sap.m.MessageBox.error("Fix highlighted fields before saving.");
-        return;
+        return false;
     }
 
-    oModel.submitChanges({
-       onSaveData: async function () {
-    var oModel = this.getView().getModel();
-    var oSmartTable = this.byId("LineItemsSmartTable");
-
-    await new Promise(function (resolve) {
-        setTimeout(resolve, 250);
-    });
-
-    var bValid = await this._validateAllConfiguredVHFieldsBeforeSave();
-
-    if (!bValid) {
-        sap.m.MessageBox.error("Fix highlighted fields before saving.");
-        return;
+    if (!oModel.hasPendingChanges()) {
+        sap.m.MessageBox.information("No changes to save.");
+        return true;
     }
+console.log("Pending changes =", oModel.hasPendingChanges());
 
-    oModel.submitChanges({
-        success: function () {
-            sap.m.MessageToast.show("Data successfully saved");
+    
+oModel.submitChanges({
 
-            oModel.refresh(true);
-            if (oSmartTable && oSmartTable.rebindTable) {
-                oSmartTable.rebindTable(true);
+    success: function (oResponse) {
+
+        // ❗ check for backend errors
+        if (oResponse && oResponse.__batchResponses) {
+
+            var bHasError = oResponse.__batchResponses.some(function (oBatch) {
+
+                if (oBatch.__changeResponses) {
+                    return oBatch.__changeResponses.some(function (oChange) {
+                        return oChange.response && oChange.response.statusCode >= 400;
+                    });
+                }
+
+                return oBatch.response && oBatch.response.statusCode >= 400;
+            });
+
+            if (bHasError) {
+                sap.m.MessageBox.error("Error during save. Please check fields.");
+                return;
             }
-
-            setTimeout(function () {
-                this._wireGenericVHValidation();
-            }.bind(this), 200);
-
-        }.bind(this),
-
-        error: function () {
-            sap.m.MessageBox.error("Error during save");
         }
-    });
+
+        sap.m.MessageToast.show("Data successfully saved");
+
+    }.bind(this),
+
+    error: function () {
+        sap.m.MessageBox.error("Error during save");
+    }
+});
+
 },
 
-        error: function () {
-            sap.m.MessageBox.error("Error during save");
-        }
-    });
-},
 
 
 _wireGenericVHValidation: function () {
+
     var oSmartTable = this.byId("LineItemsSmartTable");
     var oTable = oSmartTable && oSmartTable.getTable();
     var aCfg = this._getVhValidationConfig();
@@ -459,33 +475,73 @@ _wireGenericVHValidation: function () {
     }
 
     aCfg.forEach(function (oCfg) {
+
         var iColIdx = this._findColumnIndexByHeaderText(oTable, oCfg.headerText);
+
         if (iColIdx < 0) {
+            console.log("Column not found for:", oCfg.fieldPath);
             return;
         }
 
         oTable.getItems().forEach(function (oItem) {
+
             var oCell = oItem.getCells()[iColIdx];
             var oInput = this._resolveInputFromCell(oCell);
 
             if (!oInput) {
+                console.log("No input resolved for:", oCfg.fieldPath);
                 return;
             }
 
             var sAttachKey = "vhValidationAttached_" + oCfg.fieldPath;
+
+            // avoid attaching twice
             if (oInput.data(sAttachKey)) {
                 return;
             }
+
             oInput.data(sAttachKey, true);
 
-            oInput.attachChange(function () {
-                setTimeout(function () {
-                    var sWarehouseNo = this._getRowWarehouseNo(oItem);
-                    this._validateVHField(oInput, sWarehouseNo, oCfg);
-                }.bind(this), 200);
-            }.bind(this));
+            //  SAFE attachChange
+            if (oInput.attachChange) {
+
+                oInput.attachChange(function () {
+
+                    setTimeout(function () {
+
+                        var sWarehouseNo = this._getRowWarehouseNo(oItem);
+
+                        console.log("Change detected for:", oCfg.fieldPath);
+
+                        this._validateVHField(oInput, sWarehouseNo, oCfg);
+
+                    }.bind(this), 200);
+
+                }.bind(this));
+
+            }
+            //  fallback for controls without attachChange
+            else if (oInput.attachLiveChange) {
+
+                oInput.attachLiveChange(function () {
+
+                    setTimeout(function () {
+
+                        var sWarehouseNo = this._getRowWarehouseNo(oItem);
+
+                        this._validateVHField(oInput, sWarehouseNo, oCfg);
+
+                    }.bind(this), 200);
+
+                }.bind(this));
+
+            }
+            else {
+                console.log("No change event available for control:", oInput);
+            }
 
         }.bind(this));
+
     }.bind(this));
 },
 
@@ -493,21 +549,35 @@ _wireGenericVHValidation: function () {
 _validateVHField: function (oInput, sWarehouseNo, oCfg) {
 
     var oModel = this.getView().getModel();
-    var sValue = (oInput.getValue && oInput.getValue()) || "";
-    sValue = sValue.trim();
 
-    // Empty allowed
+    var sValue = "";
+    if (oInput && oInput.getValue) {
+        sValue = oInput.getValue();
+    }
+    sValue = (sValue || "").trim();
+
+    console.log("Validating:", oCfg.fieldPath, "Value:", sValue);
+
+    // ----------------------------------
+    // EMPTY VALUE → ALWAYS VALID
+    // ----------------------------------
     if (!sValue) {
-        oInput.setValueState("None");
-        oInput.setValueStateText("");
+
+        if (oInput && oInput.setValueState) {
+            oInput.setValueState("None");
+            oInput.setValueStateText("");
+        }
+
         return Promise.resolve(true);
     }
 
+    // ----------------------------------
+    // VALIDATION VIA VH CDS
+    // ----------------------------------
     return new Promise(function (resolve) {
 
         var aFilters = [];
 
-        // Only add warehouse filter if configured
         if (oCfg.warehouseField && sWarehouseNo) {
             aFilters.push(new sap.ui.model.Filter(
                 oCfg.warehouseField,
@@ -516,7 +586,6 @@ _validateVHField: function (oInput, sWarehouseNo, oCfg) {
             ));
         }
 
-        // Always validate the actual code field
         aFilters.push(new sap.ui.model.Filter(
             oCfg.valueField,
             sap.ui.model.FilterOperator.EQ,
@@ -526,25 +595,36 @@ _validateVHField: function (oInput, sWarehouseNo, oCfg) {
         oModel.read(oCfg.entitySet, {
             filters: aFilters,
 
-            success: function (oData) {
-                var bValid = !!(oData && oData.results && oData.results.length > 0);
+            
+success: function (oData) {
 
-                if (bValid) {
-                    oInput.setValueState("None");
-                    oInput.setValueStateText("");
-                } else {
-                    oInput.setValueState("Error");
-                    oInput.setValueStateText(oCfg.message);
-                }
+    var bValid = !!(oData && oData.results && oData.results.length > 0);
 
-                resolve(bValid);
-            },
+    // ✅ ALWAYS push value to model (CRITICAL FIX)
+    var oBinding = oInput && oInput.getBinding && oInput.getBinding("value");
+    if (oBinding) {
+        oBinding.setValue(sValue);
+    }
 
-            error: function () {
-                oInput.setValueState("Error");
-                oInput.setValueStateText("Validation failed.");
-                resolve(false);
-            }
+    if (bValid) {
+
+        if (oInput && oInput.setValueState) {
+            oInput.setValueState("None");
+            oInput.setValueStateText("");
+        }
+
+    } else {
+
+        if (oInput && oInput.setValueState) {
+            oInput.setValueState("Error");
+            oInput.setValueStateText(oCfg.message);
+        }
+
+    }
+
+    resolve(bValid);
+}
+
         });
 
     });
@@ -1284,20 +1364,23 @@ onCreateFieldChange: function (oEvent) {
 
         _getDetailedOnlyFields: function () {
             return [
-                "QuantityClassMerchandiseDistr",
-                "PrefferedAltUoMforWarehouseOp",
-                "QualityInspectionGroup",
-                "StorageBinType",
-                "StockDeterminationGroup",
-                "RelevanceForTwoStepPicking",
-                "StagingAreaDoorDetGroup",
-                "NumberOfSalesOrderItems",
-                "RecommendedStorageQuantity",
-                "DimentioRatio",
-                "WeightIndicator",
-                "VolumeIndicator",
-                "WidthIndicator",
-                "HeightIndicator"
+              
+"QuantityClassMerchandiseDistr",
+        "PrefferedAltUoMforWarehouseOp",
+        "QualityInspectionGroup",
+        "StorageBinType",
+        "StockDeterminationGroup",
+        "RelevanceForTwoStepPicking",
+        "StagingAreaDoorDetGroup",
+        "NumberOfSalesOrderItems",
+        "RecommendedStorageQuantity",
+        "DimentioRatio",
+        "WeightIndicator",
+        "VolumeIndicator",
+        "LengthIndicator",
+        "WidthIndicator",
+        "HeightIndicator"
+
             ];
         },
 
@@ -1502,7 +1585,9 @@ onToggleRowView: function (oEvent) {
         // =========================================================
         // EDIT / SAVE
         // =========================================================
+
 onEditToggled: function () {
+
     var oSmartTable = this.getView().byId("LineItemsSmartTable");
     var aToolbarContent = oSmartTable.getToolbar().getContent();
 
@@ -1517,21 +1602,42 @@ onEditToggled: function () {
     var oEditToggleBtn = aToolbarContent.find(isEditButton);
 
     if (oSmartTable.getEditable()) {
+
+        // 👉 entering edit mode
         if (oEditToggleBtn) {
             oEditToggleBtn.setIcon("sap-icon://save");
         }
 
-        // ✅ IMPORTANT: wait for FULL binding
         setTimeout(function () {
             this._applyEntitledReadOnly();
         }.bind(this), 200);
 
     } else {
+
+        // 👉 leaving edit mode → SAVE
+
         if (oEditToggleBtn) {
             oEditToggleBtn.setIcon("sap-icon://edit");
         }
 
-        this.onSaveData();
+        //  IMPORTANT: delay save to allow model update
+        setTimeout(function () {
+
+            this.onSaveData().then(function (bSuccess) {
+
+                if (!bSuccess) {
+                    // ❗ stay in edit mode if validation failed
+                    oSmartTable.setEditable(true);
+
+                    if (oEditToggleBtn) {
+                        oEditToggleBtn.setIcon("sap-icon://save");
+                    }
+                }
+
+            }.bind(this));
+
+        }.bind(this), 300); // 👈 key fix
+
     }
 },
 

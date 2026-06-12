@@ -21,7 +21,7 @@
 <smartFilterBar:SmartFilterBar
     id="smartFilterBar"
     entitySet="ZEWM_C_MATERIAL"
-  persistencyKey="SmartTableAnalytical_Explored_V4_FILTERS4"
+  persistencyKey="SmartTableAnalytical_Explored_V4_FILTERS5"
     enableBasicSearch="true">
 
     <smartFilterBar:controlConfiguration>
@@ -123,13 +123,13 @@
                     useVariantManagement="true"
                     useTablePersonalisation="true"
                     header="{i18n>smartTableHeader}"
-                    initiallyVisibleFields="WarehouseNo,MaterialNumber,MaterialDesc,PutawayControl,StorSectInd,StockRemovalCtrl,BulkStorage,ProductLoadCategory,StockDeterminationGroup,RecommendedStorageQuantity,QualityInspectionGroup,MinShelfLife,ProcBlockProfile"
-                  requestAtLeastFields="MaterialId,Scuguid,EntitledId,WarehouseNo,Entitled,MaterialNumber,MaterialDesc,ProcBlockProfile,CtrlIndicatorProcessType,DemandQuantity"
+                    initiallyVisibleFields="WarehouseNo,MaterialNumber,MaterialDesc,PutawayControl,StorSectInd,StockRemovalCtrl,BulkStorage,ProductLoadCategory,StockDeterminationGroup,RecommendedStorageQuantity,QualityInspectionGroup,MinShelfLife,ProcBlockProfile,DimentioRatio,WeightIndicator,VolumeIndicator,LengthIndicator,WidthIndicator,HeightIndicator"
+                    requestAtLeastFields="MaterialId,Scuguid,EntitledId,WarehouseNo,Entitled,MaterialNumber,MaterialDesc,ProcBlockProfile,CtrlIndicatorProcessType,DemandQuantity,DimentioRatio,WeightIndicator,VolumeIndicator,LengthIndicator,WidthIndicator,HeightIndicator,QualityInspectionGroup"
                     beforeRebindTable="onBeforeRebindTable"
                     enableExport="true"
                     beforeExport="onBeforeExport"
                     showRowCount="true"
-                    persistencyKey="SmartTableAnalytical_Explored_V4"
+                    persistencyKey="SmartTableAnalytical_Explored_V5"
                     class="sapUiResponsiveContentPadding"
                     enableAutoColumnWidth="true"
                     editTogglable="true"
