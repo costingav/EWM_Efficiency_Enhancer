@@ -13,7 +13,7 @@ sap.ui.define([
 onInit: function () {
     var oView = this.getView();
 
-var oModel = oView.getModel();
+    var oModel = oView.getModel();
 
 if (oModel) {
     oModel.setDefaultBindingMode(sap.ui.model.BindingMode.TwoWay);
@@ -378,7 +378,33 @@ _getVhValidationConfig: function () {
             message: "Invalid Volume Indicator. Use Value Help."
         },
 
+{
+    fieldPath: "LengthIndicator",
+    headerText: "Length Indicator",
+    entitySet: "/ZEWM_I_LENGTHINDVH",
+    warehouseField: "Lgnum",
+    valueField: "LengthIndicator",
+    message: "Invalid Length Indicator. Use Value Help."
+},
 
+
+{
+    fieldPath: "WidthIndicator",
+    headerText: "Width Indicator",
+    entitySet: "/ZEWM_I_WIDTHINDVH",
+    warehouseField: "Lgnum",
+    valueField: "WidthIndicator",
+    message: "Invalid Width Indicator. Use Value Help."
+},
+
+{
+    fieldPath: "HeightIndicator",
+    headerText: "Height Indicator",
+    entitySet: "/ZEWM_I_HEIGHTINDVH",
+    warehouseField: "Lgnum",
+    valueField: "HeightIndicator",
+    message: "Invalid Height Indicator. Use Value Help."
+},
     ];
 },
 
@@ -1872,6 +1898,8 @@ onToggleRowView: function (oEvent) {
         // EDIT / SAVE
         // =========================================================
 
+
+
 onEditToggled: function () {
 
     var oSmartTable = this.getView().byId("LineItemsSmartTable");
@@ -1887,9 +1915,12 @@ onEditToggled: function () {
 
     var oEditToggleBtn = aToolbarContent.find(isEditButton);
 
-    if (oSmartTable.getEditable()) {
+    // SmartTable already switched mode at this point
+    var bNowEditable = oSmartTable.getEditable();
 
-        // 👉 entering edit mode
+    if (bNowEditable) {
+
+        //  ENTERING EDIT MODE
         if (oEditToggleBtn) {
             oEditToggleBtn.setIcon("sap-icon://save");
         }
@@ -1900,41 +1931,36 @@ onEditToggled: function () {
 
     } else {
 
-        // 👉 leaving edit mode → SAVE
+        //  SAVE triggered
 
-        if (oEditToggleBtn) {
-            oEditToggleBtn.setIcon("sap-icon://edit");
-        }
+        this.getView().getModel().checkUpdate(true);
 
-        //  IMPORTANT: delay save to allow model update
-        setTimeout(function () {
+        this.onSaveData().then(function (bSuccess) {
 
-            
-this.onSaveData().then(function (bSuccess) {
+            if (bSuccess) {
 
-    if (bSuccess) {
-        //  exit edit mode properly
-        oSmartTable.setEditable(false);
+                //  SmartTable ALREADY set editable=false
+                // just sync icon + refresh
 
-        if (oEditToggleBtn) {
-            oEditToggleBtn.setIcon("sap-icon://edit");
-        }
-    } else {
-        // ❗ stay in edit mode
-        oSmartTable.setEditable(true);
+                if (oEditToggleBtn) {
+                    oEditToggleBtn.setIcon("sap-icon://edit");
+                }
 
-        if (oEditToggleBtn) {
-            oEditToggleBtn.setIcon("sap-icon://save");
-        }
+                this._forceTableRefresh();
+
+            } else {
+
+                //  revert back to edit mode
+                oSmartTable.setEditable(true);
+
+                if (oEditToggleBtn) {
+                    oEditToggleBtn.setIcon("sap-icon://save");
+                }
+            }
+
+        }.bind(this));
     }
-
-}.bind(this));
-
-
-        }.bind(this), 300); 
-
-    }
-},
+}
 
 
     });
