@@ -181,49 +181,79 @@ if (oSmartFilterBar) {
                     }
 
                     var oTable = oDialog.getTable && oDialog.getTable();
-                    if (!oTable) {
-                        return;
-                    }
 
-                    //  KEEP MULTISELECT (checkboxes)
-                    if (oTable.isA("sap.m.Table")) {
-                        oTable.setMode("MultiSelect");
-                    }
 
-                    //  robust hide logic
-                    var fnHideLgnum = function () {
+// ===============================
+// Warehouse-based VH filtering
+// ===============================
+var fnApplyWarehouseFilter = function () {
 
-                        var aCols = oTable.getColumns() || [];
-                        var aItems = oTable.getItems() || [];
+    var oSourceControl = sap.ui.getCore().byId(
+        oDialog.getInitialFocusId && oDialog.getInitialFocusId()
+    );
 
-                        //  fallback if no data yet
-                        if (aItems.length === 0) {
-                            aCols.forEach(function (oCol) {
-                                var oHeader = oCol.getHeader && oCol.getHeader();
-                                var sHeader = oHeader && oHeader.getText && oHeader.getText();
+    var oCtx = oSourceControl &&
+        oSourceControl.getBindingContext &&
+        oSourceControl.getBindingContext();
 
-                                if (sHeader && sHeader.toLowerCase().includes("warehouse")) {
-                                    oCol.setVisible(false);
-                                }
-                            });
-                            return;
-                        }
+    var sWarehouseNo = oCtx &&
+        oCtx.getProperty &&
+        oCtx.getProperty("WarehouseNo");
 
-                        var aCells = aItems[0].getCells();
+    var oBinding = oTable.getBinding("items") || oTable.getBinding("rows");
 
-                        aCols.forEach(function (oCol, i) {
+    if (!oBinding) {
+        return;
+    }
 
-                            if (!aCells[i]) {
-                                return;
-                            }
+    if (sWarehouseNo) {
+        oBinding.filter([
+            new sap.ui.model.Filter(
+                "Lgnum",
+                sap.ui.model.FilterOperator.EQ,
+                sWarehouseNo
+            )
+        ]);
+    } else {
+        oBinding.filter([]);
+    }
+};
 
-                            var oBinding = aCells[i].getBinding && aCells[i].getBinding("text");
-                            var sPath = oBinding && oBinding.getPath && oBinding.getPath();
+// ===============================
+// Hide Warehouse column
+// ===============================
+var fnHideLgnum = function () {
 
-                            //  flexible detection
-                            if (sPath && sPath.toLowerCase().includes("lgnum")) {
-                                oCol.setVisible(false);
-                            }
+    var aCols = oTable.getColumns() || [];
+    var aItems = oTable.getItems() || [];
+
+    if (aItems.length === 0) {
+        aCols.forEach(function (oCol) {
+            var oHeader = oCol.getHeader && oCol.getHeader();
+            var sHeader = oHeader && oHeader.getText && oHeader.getText();
+
+            if (sHeader && sHeader.toLowerCase().includes("warehouse")) {
+                oCol.setVisible(false);
+            }
+        });
+        return;
+    }
+
+    var aCells = aItems[0].getCells();
+
+    aCols.forEach(function (oCol, i) {
+
+        if (!aCells[i]) {
+            return;
+        }
+
+        var oBinding = aCells[i].getBinding && aCells[i].getBinding("text");
+        var sPath = oBinding && oBinding.getPath && oBinding.getPath();
+
+        if (sPath && sPath.toLowerCase().includes("lgnum")) {
+            oCol.setVisible(false);
+        }
+
                         });
                     };
 
@@ -232,12 +262,38 @@ if (oSmartFilterBar) {
 
                     //  reapply AFTER every refresh (CRITICAL)
                     if (oTable.attachUpdateFinished) {
-                        if (oDialog._vhHideHandler) {
-                            oTable.detachUpdateFinished(oDialog._vhHideHandler);
-                        }
 
-                        oDialog._vhHideHandler = fnHideLgnum;
-                        oTable.attachUpdateFinished(oDialog._vhHideHandler);
+var fnApplyWarehouseFilter = function () {
+
+    if (!oBinding) {
+        return;
+    }
+
+    if (sWarehouseNo) {
+        //  Warehouse exists → restrict VH
+        oBinding.filter([
+            new sap.ui.model.Filter(
+                "Lgnum",
+                sap.ui.model.FilterOperator.EQ,
+                sWarehouseNo
+            )
+        ]);
+    } else {
+        //  No warehouse → show all
+        oBinding.filter([]);
+    }
+};
+
+                       
+if (oDialog._vhUpdateHandler) {
+    oTable.detachUpdateFinished(oDialog._vhUpdateHandler);
+}
+
+oDialog._vhUpdateHandler = function () {
+    fnApplyWarehouseFilter(); // apply VH filter
+    fnHideLgnum();            // hide column
+};
+              oDialog._vhHideHandler = fnHideLgnum;           
                     }
 
                 } catch (e) {
@@ -255,7 +311,7 @@ _getVhValidationConfig: function () {
             fieldPath: "StorageBinType",
             headerText: "Storage Bin",
             entitySet: "/ZEWM_I_LPTYPVH",
-            warehouseField: "WarehouseNo",
+            warehouseField: "Lgnum",
             valueField: "StorageBinType",
             message: "Invalid Storage Bin Type. Use Value Help."
         },
@@ -354,7 +410,7 @@ _getVhValidationConfig: function () {
             fieldPath: "ProcBlockProfile",
             headerText: "Process Block",
             entitySet: "/ZEWM_I_PROCPRFLVH",
-            warehouseField: "WarehouseNo",
+            warehouseField: "Lgnum",
             valueField: "ProcBlockProfile",
             message: "Invalid Process Block Profile. Use Value Help."
         },
@@ -466,6 +522,60 @@ _resolveInputFromCell: function (oCell) {
 },
 
 
+_findInputInRowByFieldPath: function (oItem, sFieldPath) {
+    if (!oItem || !oItem.findAggregatedObjects) {
+        return null;
+    }
+
+    var aCandidates = oItem.findAggregatedObjects(true, function (oControl) {
+        if (!oControl.getBinding) {
+            return false;
+        }
+
+        var oBinding = oControl.getBinding("value");
+        return !!(oBinding && oBinding.getPath && oBinding.getPath() === sFieldPath);
+    });
+
+    return aCandidates.length ? aCandidates[0] : null;
+},
+
+
+_focusInvalidField: function (oItem, sFieldPath) {
+
+    if (!oItem || !oItem.findAggregatedObjects) {
+        return;
+    }
+
+    var aControls = oItem.findAggregatedObjects(true);
+
+    for (var i = 0; i < aControls.length; i++) {
+
+        var oControl = aControls[i];
+
+        if (oControl.getBinding) {
+            var oBinding = oControl.getBinding("value");
+
+            if (oBinding && oBinding.getPath() === sFieldPath) {
+
+                if (oControl.setValueState) {
+                    oControl.setValueState("Error");
+                }
+
+                if (oControl.focus) {
+                    setTimeout(function () {
+                        oControl.focus();
+                    }, 200);
+                }
+
+                return oControl;
+            }
+        }
+    }
+
+    return null;
+},
+
+
 _findColumnIndexByFieldPath: function (oTable, sFieldPath) {
     var aColumns = oTable.getColumns() || [];
 
@@ -501,7 +611,6 @@ _findColumnIndexByFieldPath: function (oTable, sFieldPath) {
 },
 
 
-
 onSaveData: async function () {
 
     var oModel = this.getView().getModel();
@@ -512,22 +621,76 @@ onSaveData: async function () {
         setTimeout(resolve, 200);
     });
 
+    //  FIRST: if nothing changed, do nothing and exit cleanly
+    if (!oModel.hasPendingChanges()) {
+        console.log("No changes to save");
+        return true;
+    }
+
+var oTable = oSmartTable && oSmartTable.getTable();
+var aItems = (oTable && oTable.getItems) ? oTable.getItems() : [];
+
+for (var i = 0; i < aItems.length; i++) {
+
+    var oCtx = aItems[i].getBindingContext();
+    if (!oCtx) continue;
+
+    var sWarehouse = oCtx.getProperty("WarehouseNo");
+
+    var sPendingKey = oCtx.getPath().replace(/^\//, "");
+    var mPending = oModel.getPendingChanges();
+
+    if (!mPending[sPendingKey]) continue;
+
+    if (!sWarehouse) {
+        sap.m.MessageBox.error(
+            "Cannot edit material without warehouse. Please use Create instead."
+        );
+        return false;
+    }
+}
+
+
+    //  Quantity + UoM consistency guard ONLY for changed rows
+    var oTable = oSmartTable && oSmartTable.getTable();
+    var aItems = (oTable && oTable.getItems) ? oTable.getItems() : [];
+    var mPending = oModel.getPendingChanges ? oModel.getPendingChanges() : {};
+
+    for (var i = 0; i < aItems.length; i++) {
+        var oCtx = aItems[i].getBindingContext();
+        if (!oCtx) {
+            continue;
+        }
+
+        var sPendingKey = oCtx.getPath().replace(/^\//, "");
+        if (!mPending[sPendingKey]) {
+            continue; //  unchanged row → ignore
+        }
+
+        var qty = oCtx.getProperty("RecommendedStorageQuantity");
+        var uom = oCtx.getProperty("PrefferedAltUoMforWarehouseOp");
+
+        var sQty = String(qty || "").trim();
+        var nQty = parseFloat(sQty.replace(",", "."));
+        var bHasQuantity = !isNaN(nQty) && nQty > 0;
+
+        if (bHasQuantity && !uom) {
+            sap.m.MessageBox.error(
+                "Preferred UoM is required when Recommended Storage Quantity is filled."
+            );
+            return false;
+        }
+    }
+
     console.log("Starting VH validation BEFORE save...");
 
     var bValid = await this._validateAllConfiguredVHFieldsBeforeSave();
 
     console.log("Validation finished. Result =", bValid);
 
-    
-if (!bValid) {
-    sap.m.MessageBox.error("Fix highlighted fields before saving.");
-    return false;   
-}
-
-
-    if (!oModel.hasPendingChanges()) {
-        console.log("No changes to save");
-        return true;
+    if (!bValid) {
+        sap.m.MessageBox.error("Fix highlighted fields before saving.");
+        return false;
     }
 
     return new Promise(function (resolve) {
@@ -539,23 +702,93 @@ if (!bValid) {
                 var bHasError = false;
 
                 if (oResponse && oResponse.__batchResponses) {
-                    bHasError = oResponse.__batchResponses.some(function (oBatch) {
+                    oResponse.__batchResponses.forEach(function (oBatch) {
+
                         if (oBatch.__changeResponses) {
-                            return oBatch.__changeResponses.some(function (oChange) {
-                                return oChange.response &&
-                                       oChange.response.statusCode >= 400;
+                            oBatch.__changeResponses.forEach(function (oChange) {
+
+                                if (oChange.response &&
+                                    parseInt(oChange.response.statusCode, 10) >= 400) {
+                                    bHasError = true;
+                                }
+
+                                if (oChange.response &&
+                                    oChange.response.body &&
+                                    oChange.response.body.indexOf("error") !== -1) {
+                                    bHasError = true;
+                                }
                             });
                         }
-                        return oBatch.response &&
-                               oBatch.response.statusCode >= 400;
+
+                        if (oBatch.response &&
+                            parseInt(oBatch.response.statusCode, 10) >= 400) {
+                            bHasError = true;
+                        }
                     });
                 }
 
-                if (bHasError) {
-                    sap.m.MessageBox.error("Error during save. Please check fields.");
-                    resolve(false);
-                    return;
-                }
+                
+if (bHasError) {
+
+    let sBackendMsg = "Unknown backend error.";
+
+    if (oResponse && oResponse.__batchResponses) {
+
+        oResponse.__batchResponses.forEach(function (oBatch) {
+
+            if (oBatch.__changeResponses) {
+
+                oBatch.__changeResponses.forEach(function (oChange) {
+
+                    if (oChange.response && oChange.response.body) {
+
+                        var sBody = oChange.response.body;
+
+                        try {
+                            var oError = JSON.parse(sBody);
+
+                            //  Standard SAP error structure
+                            if (oError.error &&
+                                oError.error.message &&
+                                oError.error.message.value) {
+
+                                sBackendMsg = oError.error.message.value;
+                            }
+
+                            //  Alternative innererror structure
+                            else if (oError.error &&
+                                     oError.error.innererror &&
+                                     oError.error.innererror.errordetails &&
+                                     oError.error.innererror.errordetails.length > 0) {
+
+                                sBackendMsg = oError.error.innererror.errordetails[0].message;
+                            }
+
+                        } catch (e) {
+                            //  fallback: plain text extraction
+                            if (typeof sBody === "string" && sBody.length < 500) {
+                                sBackendMsg = sBody;
+                            }
+
+                            console.log("RAW BACKEND BODY:", sBody);
+                        }
+                    }
+
+                });
+
+            }
+
+        });
+
+    }
+
+    console.log("FINAL BACKEND ERROR MESSAGE:", sBackendMsg);
+
+    sap.m.MessageBox.error(sBackendMsg);
+
+    resolve(false);
+    return;
+}
 
                 sap.m.MessageToast.show("Data successfully saved");
                 resolve(true);
@@ -570,8 +803,6 @@ if (!bValid) {
 
     }.bind(this));
 },
-
-
 
 _wireGenericVHValidation: function () {
 
@@ -636,7 +867,6 @@ _wireGenericVHValidation: function () {
 },
 
 
-
 _validateVHField: function (oInput, sWarehouseNo, oCfg) {
 
     var oModel = this.getView().getModel();
@@ -649,10 +879,18 @@ _validateVHField: function (oInput, sWarehouseNo, oCfg) {
 
     console.log("Validating:", oCfg.fieldPath, "Value:", sValue);
 
-    // ----------------------------------
-    // EMPTY VALUE → ALWAYS VALID
-    // ----------------------------------
+    var oBinding = oInput && oInput.getBinding && oInput.getBinding("value");
+    var oCtx = oBinding && oBinding.getContext ? oBinding.getContext() : null;
+    var sRelativePath = oBinding && oBinding.getPath ? oBinding.getPath() : "";
+    var sAbsolutePath = (oCtx && sRelativePath) ? (oCtx.getPath() + "/" + sRelativePath) : "";
+
+    //  EMPTY VALUE → ALWAYS VALID + WRITE EMPTY TO MODEL
     if (!sValue) {
+
+        if (sAbsolutePath) {
+            oModel.setProperty(sAbsolutePath, "");
+            oModel.checkUpdate(true);
+        }
 
         if (oInput && oInput.setValueState) {
             oInput.setValueState("None");
@@ -662,9 +900,6 @@ _validateVHField: function (oInput, sWarehouseNo, oCfg) {
         return Promise.resolve(true);
     }
 
-    // ----------------------------------
-    // VALIDATION VIA VH CDS
-    // ----------------------------------
     return new Promise(function (resolve) {
 
         var aFilters = [];
@@ -690,25 +925,19 @@ _validateVHField: function (oInput, sWarehouseNo, oCfg) {
 
                 var bValid = !!(oData && oData.results && oData.results.length > 0);
 
-if (!bValid) {
-    console.log(" INVALID FIELD:",
-        oCfg.fieldPath,
-        "Value:", sValue,
-        "Warehouse:", sWarehouseNo
-    );
-}
-
-
-                var oBinding = oInput && oInput.getBinding && oInput.getBinding("value");
-                var oCtx = oBinding && oBinding.getContext ? oBinding.getContext() : null;
-                var sRelativePath = oBinding && oBinding.getPath ? oBinding.getPath() : "";
-                var sAbsolutePath = (oCtx && sRelativePath) ? (oCtx.getPath() + "/" + sRelativePath) : "";
+                if (!bValid) {
+                    console.log("INVALID FIELD:",
+                        oCfg.fieldPath,
+                        "Value:", sValue,
+                        "Warehouse:", sWarehouseNo
+                    );
+                }
 
                 if (bValid) {
 
                     if (sAbsolutePath) {
-                        this.getView().getModel().setProperty(sAbsolutePath, sValue);
-                        this.getView().getModel().checkUpdate(true);
+                        oModel.setProperty(sAbsolutePath, sValue);
+                        oModel.checkUpdate(true);
                     }
 
                     if (oInput && oInput.setValueState) {
@@ -718,24 +947,14 @@ if (!bValid) {
 
                 } else {
 
-    if (oInput && oInput.setValueState) {
-        oInput.setValueState("Error");
-        oInput.setValueStateText(oCfg.message);
-    }
+                    if (oInput && oInput.setValueState) {
+                        oInput.setValueState("Error");
+                        oInput.setValueStateText(oCfg.message);
+                    }
 
-    //  CRITICAL: do not keep old DB value
-    oInput.setValue("");
-
-    var oBinding = oInput.getBinding("value");
-    var oCtx = oBinding && oBinding.getContext();
-    var sPath = oBinding && oBinding.getPath();
-
-    if (oCtx && sPath) {
-        var sFullPath = oCtx.getPath() + "/" + sPath;
-        this.getView().getModel().setProperty(sFullPath, "");
-        this.getView().getModel().checkUpdate(true);
-    }
-}
+                    // ❗ Do NOT overwrite back-end value here
+                    // Leave current UI value visible, save-time validation will block submit
+                }
 
                 resolve(bValid);
             }.bind(this),
@@ -757,43 +976,125 @@ _validateAllConfiguredVHFieldsBeforeSave: function () {
     var oSmartTable = this.byId("LineItemsSmartTable");
     var oTable = oSmartTable && oSmartTable.getTable();
     var aCfg = this._getVhValidationConfig();
+    var oModel = this.getView().getModel();
 
     if (!oTable || !oTable.getItems) {
         return Promise.resolve(true);
     }
 
     var aPromises = [];
+    var mPending = oModel.getPendingChanges ? oModel.getPendingChanges() : {};
 
-    aCfg.forEach(function (oCfg) {
-        var iColIdx = this._findColumnIndexByFieldPath(oTable, oCfg.fieldPath);
+    
+oTable.getItems().forEach(function (oItem) {
 
-        if (iColIdx < 0) {
-            console.log("Validation scan: column not found for", oCfg.fieldPath);
-            return;
-        }
+    var oCtx = oItem.getBindingContext();
 
-        oTable.getItems().forEach(function (oItem) {
-            var oCell = oItem.getCells()[iColIdx];
-            var oInput = this._resolveInputFromCell(oCell);
+    //  correct: check AFTER declaration
+    if (!oCtx) {
+        return;
+    }
 
-            if (!oInput) {
+    var sPendingKey = oCtx.getPath().replace(/^\//, "");
+
+    if (!mPending[sPendingKey]) {
+        return;
+    }
+
+    var sWarehouseNo = oCtx.getProperty("WarehouseNo") || "";
+
+
+        aCfg.forEach(function (oCfg) {
+            var sValue = oCtx.getProperty(oCfg.fieldPath);
+
+var sPendingKey = oCtx.getPath().replace(/^\//, "");
+var oPendingRow = mPending[sPendingKey];
+
+// ONLY validate fields that were actually changed
+
+if (!oPendingRow) {
+    return;
+}
+
+// ONLY validate if field value actually changed
+var sOldValue = oItem.getBindingContext().getObject()[oCfg.fieldPath];
+
+if (sOldValue === sValue) {
+    return; // not changed → skip
+
+}
+
+            sValue = (sValue === null || sValue === undefined) ? "" : String(sValue).trim();
+
+            //  empty / zero-like values are valid here
+            if (!sValue || sValue === "0" || sValue === "0.000") {
+                aPromises.push(Promise.resolve(true));
                 return;
             }
 
-            var sWarehouseNo = this._getRowWarehouseNo(oItem);
-            aPromises.push(this._validateVHField(oInput, sWarehouseNo, oCfg));
+            var oInput = this._findInputInRowByFieldPath(oItem, oCfg.fieldPath);
+
+            var aFilters = [];
+
+            if (oCfg.warehouseField && sWarehouseNo) {
+                aFilters.push(new sap.ui.model.Filter(
+                    oCfg.warehouseField,
+                    sap.ui.model.FilterOperator.EQ,
+                    sWarehouseNo
+                ));
+            }
+
+            aFilters.push(new sap.ui.model.Filter(
+                oCfg.valueField,
+                sap.ui.model.FilterOperator.EQ,
+                sValue
+            ));
+
+            aPromises.push(new Promise(function (resolve) {
+                oModel.read(oCfg.entitySet, {
+                    filters: aFilters,
+
+                    success: function (oData) {
+                        var bValid = !!(oData && oData.results && oData.results.length > 0);
+
+                        if (oInput && oInput.setValueState) {
+                            oInput.setValueState(bValid ? "None" : "Error");
+                            oInput.setValueStateText(bValid ? "" : oCfg.message);
+                        }
+
+                        if (!bValid) {
+                            console.log(
+                                "INVALID FIELD:",
+                                oCfg.fieldPath,
+                                "Value:", sValue,
+                                "Warehouse:", sWarehouseNo
+                            );
+
+                            if (oInput && oInput.focus) {
+                                setTimeout(function () {
+                                    oInput.focus();
+                                }, 150);
+                            }
+                        }
+
+                        resolve(bValid);
+                    }.bind(this),
+
+                    error: function () {
+                        if (oInput && oInput.setValueState) {
+                            oInput.setValueState("Error");
+                            oInput.setValueStateText("Validation failed.");
+                        }
+                        resolve(false);
+                    }.bind(this)
+                });
+            }.bind(this)));
+
         }.bind(this));
     }.bind(this));
 
     return Promise.all(aPromises).then(function (aResults) {
-        var bAllValid = true;
-
-        aResults.forEach(function (bValid, index) {
-            if (!bValid) {
-                console.log(" INVALID FIELD:", oCfg.fieldPath, "Value:", sValue, "Warehouse:", sWarehouseNo);
-                bAllValid = false;
-            }
-        });
+        var bAllValid = aResults.every(Boolean);
 
         if (!bAllValid) {
             console.log("Validation failed - preventing submit");
@@ -802,7 +1103,6 @@ _validateAllConfiguredVHFieldsBeforeSave: function () {
         return bAllValid;
     });
 },
-
 
 
 _getRowWarehouseNo: function (oItem) {
@@ -1572,76 +1872,69 @@ onCreateFieldChange: function (oEvent) {
             return true;
         },
 
-       applyMassChange: async function () {
-            var oModel = this.getView().getModel();
-            var aSelectedItems = this.table.getSelectedItems();
-            var oDialogObject = oModel.getProperty(this.oContextNewEntry.sPath);
+      
+applyMassChange: async function () {
+    var oModel = this.getView().getModel();
+    var aSelectedItems = this.table.getSelectedItems();
+    var oDialogObject = oModel.getProperty(this.oContextNewEntry.sPath);
 
-            // Qty requires UoM only if Qty is meaningfully filled (> 0)
-            if (this._hasMeaningfulMassChangeValue(oDialogObject.RecommendedStorageQuantity, "RecommendedStorageQuantity") &&
-                !this._hasMeaningfulMassChangeValue(oDialogObject.PrefferedAltUoMforWarehouseOp, "PrefferedAltUoMforWarehouseOp")) {
-                sap.m.MessageToast.show("Preferred UoM is required when Recommended Storage Quantity is filled.");
-                return;
+    // Qty requires UoM only if Qty is meaningfully filled (> 0)
+    if (this._hasMeaningfulMassChangeValue(oDialogObject.RecommendedStorageQuantity, "RecommendedStorageQuantity") &&
+        !this._hasMeaningfulMassChangeValue(oDialogObject.PrefferedAltUoMforWarehouseOp, "PrefferedAltUoMforWarehouseOp")) {
+        sap.m.MessageToast.show("Preferred UoM is required when Recommended Storage Quantity is filled.");
+        return;
+    }
+
+    var aMassChangeFields = [
+        "PutawayControl",
+        "StorSectInd",
+        "StockRemovalCtrl",
+        "BulkStorage",
+        "ProcBlockProfile",
+        "CtrlIndicatorProcessType",
+        "ProductLoadCategory",
+        "CycleCountingIndicator",
+        "MinShelfLife",
+        "QuantityClassMerchandiseDistr",
+        "PrefferedAltUoMforWarehouseOp",
+        "QualityInspectionGroup",
+        "StorageBinType",
+        "StockDeterminationGroup",
+        "RelevanceForTwoStepPicking",
+        "StagingAreaDoorDetGroup",
+        "NumberOfSalesOrderItems",
+        "RecommendedStorageQuantity",
+        "DimentioRatio",
+        "WeightIndicator",
+        "VolumeIndicator",
+        "WidthIndicator",
+        "HeightIndicator",
+        "LengthIndicator"
+    ];
+
+    aSelectedItems.forEach(function (oItem) {
+        var oContext = oItem.getBindingContext();
+
+        aMassChangeFields.forEach(function (sField) {
+            if (this._hasMeaningfulMassChangeValue(oDialogObject[sField], sField)) {
+                oModel.setProperty(sField, oDialogObject[sField], oContext);
             }
+        }.bind(this));
+    }.bind(this));
 
-            var aMassChangeFields = [
-                "PutawayControl",
-                "StorSectInd",
-                "StockRemovalCtrl",
-                "BulkStorage",
+    this.deleteModelEntry(this.oContextNewEntry);
+    this.oContextNewEntry = null;
 
-                "ProcBlockProfile",
-                "CtrlIndicatorProcessType",
-                "ProductLoadCategory",
-                "CycleCountingIndicator",
-                "MinShelfLife",
-                "QuantityClassMerchandiseDistr",
-                "PrefferedAltUoMforWarehouseOp",
-                "QualityInspectionGroup",
-                "StorageBinType",
-                "StockDeterminationGroup",
-                "RelevanceForTwoStepPicking",
-                "StagingAreaDoorDetGroup",
-                "NumberOfSalesOrderItems",
-                "RecommendedStorageQuantity",
-                "DimentioRatio",
-                "WeightIndicator",
-                "VolumeIndicator",
-                "WidthIndicator",
-                "HeightIndicator",
-                "LengthIndicator"
-            ];
+    if (this.oMassDialog) {
+        this.oMassDialog.close();
+    }
 
-            aSelectedItems.forEach(function (oItem) {
-                var oContext = oItem.getBindingContext();
+    var bSuccess = await this.onSaveData();
 
-                aMassChangeFields.forEach(function (sField) {
-                    if (this._hasMeaningfulMassChangeValue(oDialogObject[sField], sField)) {
-                        oModel.setProperty(sField, oDialogObject[sField], oContext);
-                    }
-                }.bind(this));
-            }.bind(this));
-
-            
-this.deleteModelEntry(this.oContextNewEntry);
-this.oContextNewEntry = null;
-
-if (this.oMassDialog) {
-    this.oMassDialog.close();
-}
-
-var bSuccess = await this.onSaveData();
-
-if (!bSuccess) {
-    return;
-}
-
-if (!bValid) {
-    console.log(" INVALID FIELD:", oCfg.fieldPath, sValue);
-}
-
-
-        },
+    if (!bSuccess) {
+        return;
+    }
+},
 
         _createMassChangeEntry: function () {
             var oModel = this.getView().getModel();
