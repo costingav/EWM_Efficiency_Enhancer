@@ -336,7 +336,7 @@ _getVhValidationConfig: function () {
             fieldPath: "CycleCountingIndicator",
             headerText: "Cyc.Count Ind.",
             entitySet: "/ZEWM_I_CCINDVH",
-            warehouseField: "WarehouseNo",
+            warehouseField: null,
             valueField: "CycleCountingIndicator",
             message: "Invalid Cycle Counting Indicator. Use Value Help."
         },
@@ -390,23 +390,26 @@ _getVhValidationConfig: function () {
 
 {
     fieldPath: "WidthIndicator",
-    headerText: "Width Indicator",
     entitySet: "/ZEWM_I_WIDTHINDVH",
     warehouseField: "Lgnum",
-    valueField: "WidthIndicator",
+    valueField: "Dimind",
     message: "Invalid Width Indicator. Use Value Help."
-},
+}
+,
 
 {
     fieldPath: "HeightIndicator",
-    headerText: "Height Indicator",
     entitySet: "/ZEWM_I_HEIGHTINDVH",
     warehouseField: "Lgnum",
-    valueField: "HeightIndicator",
+    valueField: "Dimind",
     message: "Invalid Height Indicator. Use Value Help."
-},
+}
+
+
     ];
 },
+
+
 
 _forceTableRefresh: function () {
     var oSmartTable = this.byId("LineItemsSmartTable");
@@ -463,15 +466,33 @@ _resolveInputFromCell: function (oCell) {
 },
 
 
-
-_findColumnIndexByHeaderText: function (oTable, sHeaderContains) {
+_findColumnIndexByFieldPath: function (oTable, sFieldPath) {
     var aColumns = oTable.getColumns() || [];
 
     for (var i = 0; i < aColumns.length; i++) {
-        var oHeader = aColumns[i].getHeader && aColumns[i].getHeader();
-        var sText = oHeader && oHeader.getText && oHeader.getText();
+        var oColumn = aColumns[i];
+        var vP13nData = oColumn.data("p13nData");
+        var sLeadingProperty = "";
 
-        if (sText && sText.indexOf(sHeaderContains) !== -1) {
+        if (typeof vP13nData === "string") {
+            try {
+                sLeadingProperty = JSON.parse(vP13nData).leadingProperty || "";
+            } catch (e) {
+                sLeadingProperty = "";
+            }
+        } else if (vP13nData && typeof vP13nData === "object") {
+            sLeadingProperty = vP13nData.leadingProperty || "";
+        }
+
+        if (sLeadingProperty === sFieldPath) {
+            return i;
+        }
+
+        if (oColumn.getSortProperty && oColumn.getSortProperty() === sFieldPath) {
+            return i;
+        }
+
+        if (oColumn.getFilterProperty && oColumn.getFilterProperty() === sFieldPath) {
             return i;
         }
     }
@@ -481,84 +502,73 @@ _findColumnIndexByHeaderText: function (oTable, sHeaderContains) {
 
 
 
-_getCellValue: function (oCell) {
-    if (!oCell) {
-        return "";
-    }
-
-    if (oCell.getText) {
-        return oCell.getText();
-    }
-
-    if (oCell.getValue) {
-        return oCell.getValue();
-    }
-
-    if (oCell.getSelectedKey) {
-        return oCell.getSelectedKey();
-    }
-
-    return "";
-},
-
-
 onSaveData: async function () {
+
     var oModel = this.getView().getModel();
     var oSmartTable = this.byId("LineItemsSmartTable");
 
+    // give UI time to flush input values
     await new Promise(function (resolve) {
-        setTimeout(resolve, 250);
+        setTimeout(resolve, 200);
     });
+
+    console.log("Starting VH validation BEFORE save...");
 
     var bValid = await this._validateAllConfiguredVHFieldsBeforeSave();
 
-    if (!bValid) {
-        sap.m.MessageBox.error("Fix highlighted fields before saving.");
-        return false;
-    }
+    console.log("Validation finished. Result =", bValid);
 
     
-if (!oModel.hasPendingChanges()) {
-    console.log("No changes to save - skipping");
-    return true;
+if (!bValid) {
+    sap.m.MessageBox.error("Fix highlighted fields before saving.");
+    return false;   
 }
 
-console.log("Pending changes =", oModel.hasPendingChanges());
 
-    
-oModel.submitChanges({
+    if (!oModel.hasPendingChanges()) {
+        console.log("No changes to save");
+        return true;
+    }
 
-    success: function (oResponse) {
+    return new Promise(function (resolve) {
 
-        //check for backend errors
-        if (oResponse && oResponse.__batchResponses) {
+        oModel.submitChanges({
 
-            var bHasError = oResponse.__batchResponses.some(function (oBatch) {
+            success: function (oResponse) {
 
-                if (oBatch.__changeResponses) {
-                    return oBatch.__changeResponses.some(function (oChange) {
-                        return oChange.response && oChange.response.statusCode >= 400;
+                var bHasError = false;
+
+                if (oResponse && oResponse.__batchResponses) {
+                    bHasError = oResponse.__batchResponses.some(function (oBatch) {
+                        if (oBatch.__changeResponses) {
+                            return oBatch.__changeResponses.some(function (oChange) {
+                                return oChange.response &&
+                                       oChange.response.statusCode >= 400;
+                            });
+                        }
+                        return oBatch.response &&
+                               oBatch.response.statusCode >= 400;
                     });
                 }
 
-                return oBatch.response && oBatch.response.statusCode >= 400;
-            });
+                if (bHasError) {
+                    sap.m.MessageBox.error("Error during save. Please check fields.");
+                    resolve(false);
+                    return;
+                }
 
-            if (bHasError) {
-                sap.m.MessageBox.error("Error during save. Please check fields.");
-                return;
+                sap.m.MessageToast.show("Data successfully saved");
+                resolve(true);
+
+            }.bind(this),
+
+            error: function () {
+                sap.m.MessageBox.error("Error during save");
+                resolve(false);
             }
-        }
+        });
 
-        sap.m.MessageToast.show("Data successfully saved");
-
-    }.bind(this),
-
-    error: function () {
-        sap.m.MessageBox.error("Error during save");
-    }
-});
-
+    }.bind(this));
 },
 
 
@@ -575,10 +585,10 @@ _wireGenericVHValidation: function () {
 
     aCfg.forEach(function (oCfg) {
 
-        var iColIdx = this._findColumnIndexByHeaderText(oTable, oCfg.headerText);
+        var iColIdx = this._findColumnIndexByFieldPath(oTable, oCfg.fieldPath);
 
         if (iColIdx < 0) {
-            console.log("Column not found for:", oCfg.fieldPath);
+            console.log("Column not found for fieldPath:", oCfg.fieldPath);
             return;
         }
 
@@ -594,63 +604,37 @@ _wireGenericVHValidation: function () {
 
             var sAttachKey = "vhValidationAttached_" + oCfg.fieldPath;
 
-            // avoid attaching twice
             if (oInput.data(sAttachKey)) {
                 return;
             }
 
             oInput.data(sAttachKey, true);
 
-            //  SAFE attachChange
-           
-if (oInput && (oInput.attachChange || oInput.attachLiveChange)) {
+            var fnHandler = function () {
+                setTimeout(function () {
+                    var sWarehouseNo = this._getRowWarehouseNo(oItem);
+                    console.log("VALIDATING FIELD:", oCfg.fieldPath);
+                    this._validateVHField(oInput, sWarehouseNo, oCfg);
+                }.bind(this), 200);
+            }.bind(this);
 
-    var fnHandler = function () {
-
-        setTimeout(function () {
-
-            var sWarehouseNo = this._getRowWarehouseNo(oItem);
-
-            console.log("Change detected for:", oCfg.fieldPath);
-
-            this._validateVHField(oInput, sWarehouseNo, oCfg);
-
-        }.bind(this), 200);
-    }.bind(this);
-
-    if (oInput.attachChange) {
-        oInput.attachChange(fnHandler);
-    }
-
-    if (oInput.attachLiveChange) {
-        oInput.attachLiveChange(fnHandler);
-    }
-}
-
-            //  fallback for controls without attachChange
-            else if (oInput.attachLiveChange) {
-
-                oInput.attachLiveChange(function () {
-
-                    setTimeout(function () {
-
-                        var sWarehouseNo = this._getRowWarehouseNo(oItem);
-
-                        this._validateVHField(oInput, sWarehouseNo, oCfg);
-
-                    }.bind(this), 200);
-
-                }.bind(this));
-
+            if (oInput.attachChange) {
+                oInput.attachChange(fnHandler);
             }
-            else {
-                console.log("No change event available for control:", oInput);
+
+            if (oInput.attachLiveChange) {
+                oInput.attachLiveChange(fnHandler);
+            }
+
+            if (oInput.attachBrowserEvent) {
+                oInput.attachBrowserEvent("focusout", fnHandler);
             }
 
         }.bind(this));
 
     }.bind(this));
 },
+
 
 
 _validateVHField: function (oInput, sWarehouseNo, oCfg) {
@@ -702,45 +686,71 @@ _validateVHField: function (oInput, sWarehouseNo, oCfg) {
         oModel.read(oCfg.entitySet, {
             filters: aFilters,
 
-            
-success: function (oData) {
+            success: function (oData) {
 
-    var bValid = !!(oData && oData.results && oData.results.length > 0);
+                var bValid = !!(oData && oData.results && oData.results.length > 0);
 
-    //  ALWAYS push value to model (CRITICAL FIX)
-  
-var oCtx = oInput.getBindingContext();
-var sPath = oInput.getBinding("value")?.getPath();
-
-if (oCtx && sPath) {
-    this.getView().getModel().setProperty(sPath, sValue, oCtx);
+if (!bValid) {
+    console.log(" INVALID FIELD:",
+        oCfg.fieldPath,
+        "Value:", sValue,
+        "Warehouse:", sWarehouseNo
+    );
 }
 
 
-    if (bValid) {
+                var oBinding = oInput && oInput.getBinding && oInput.getBinding("value");
+                var oCtx = oBinding && oBinding.getContext ? oBinding.getContext() : null;
+                var sRelativePath = oBinding && oBinding.getPath ? oBinding.getPath() : "";
+                var sAbsolutePath = (oCtx && sRelativePath) ? (oCtx.getPath() + "/" + sRelativePath) : "";
 
-        if (oInput && oInput.setValueState) {
-            oInput.setValueState("None");
-            oInput.setValueStateText("");
-        }
+                if (bValid) {
 
-    } else {
+                    if (sAbsolutePath) {
+                        this.getView().getModel().setProperty(sAbsolutePath, sValue);
+                        this.getView().getModel().checkUpdate(true);
+                    }
 
-        if (oInput && oInput.setValueState) {
-            oInput.setValueState("Error");
-            oInput.setValueStateText(oCfg.message);
-        }
+                    if (oInput && oInput.setValueState) {
+                        oInput.setValueState("None");
+                        oInput.setValueStateText("");
+                    }
 
+                } else {
+
+    if (oInput && oInput.setValueState) {
+        oInput.setValueState("Error");
+        oInput.setValueStateText(oCfg.message);
     }
 
-    resolve(bValid);
+    //  CRITICAL: do not keep old DB value
+    oInput.setValue("");
+
+    var oBinding = oInput.getBinding("value");
+    var oCtx = oBinding && oBinding.getContext();
+    var sPath = oBinding && oBinding.getPath();
+
+    if (oCtx && sPath) {
+        var sFullPath = oCtx.getPath() + "/" + sPath;
+        this.getView().getModel().setProperty(sFullPath, "");
+        this.getView().getModel().checkUpdate(true);
+    }
 }
 
+                resolve(bValid);
+            }.bind(this),
+
+            error: function () {
+                if (oInput && oInput.setValueState) {
+                    oInput.setValueState("Error");
+                    oInput.setValueStateText("Validation failed.");
+                }
+                resolve(false);
+            }
         });
 
-    });
+    }.bind(this));
 },
-
 
 
 _validateAllConfiguredVHFieldsBeforeSave: function () {
@@ -755,8 +765,10 @@ _validateAllConfiguredVHFieldsBeforeSave: function () {
     var aPromises = [];
 
     aCfg.forEach(function (oCfg) {
-        var iColIdx = this._findColumnIndexByHeaderText(oTable, oCfg.headerText);
+        var iColIdx = this._findColumnIndexByFieldPath(oTable, oCfg.fieldPath);
+
         if (iColIdx < 0) {
+            console.log("Validation scan: column not found for", oCfg.fieldPath);
             return;
         }
 
@@ -774,26 +786,24 @@ _validateAllConfiguredVHFieldsBeforeSave: function () {
     }.bind(this));
 
     return Promise.all(aPromises).then(function (aResults) {
-        
+        var bAllValid = true;
 
-var bAllValid = true;
+        aResults.forEach(function (bValid, index) {
+            if (!bValid) {
+                console.log(" INVALID FIELD:", oCfg.fieldPath, "Value:", sValue, "Warehouse:", sWarehouseNo);
+                bAllValid = false;
+            }
+        });
 
-aResults.forEach(function (bValid, index) {
-    if (!bValid) {
-        console.log("Invalid field detected in validation index:", index);
-        bAllValid = false;
-    }
-});
+        if (!bAllValid) {
+            console.log("Validation failed - preventing submit");
+        }
 
-
-if (!bAllValid) {
-    console.log("Validation failed - preventing submit");
-}
-
-return bAllValid;
-
+        return bAllValid;
     });
 },
+
+
 
 _getRowWarehouseNo: function (oItem) {
     var oCtx = oItem && oItem.getBindingContext && oItem.getBindingContext();
@@ -1291,20 +1301,39 @@ Scuguid: oSource.Scuguid || "",
     // 5) Submit all created entries
     // --------------------------------------------
     oModel.submitChanges({
-        success: function (oResponse) {
+        
+success: function (oResponse) {
 
-            var bHasError = false;
+    var bHasError = false;
 
-            if (oResponse && oResponse.__batchResponses) {
-                bHasError = oResponse.__batchResponses.some(function (oBatch) {
-                    if (oBatch.__changeResponses) {
-                        return oBatch.__changeResponses.some(function (oChange) {
-                            return oChange.response && parseInt(oChange.response.statusCode, 10) >= 400;
-                        });
+    if (oResponse && oResponse.__batchResponses) {
+
+        oResponse.__batchResponses.forEach(function (oBatch) {
+
+            if (oBatch.__changeResponses) {
+
+                oBatch.__changeResponses.forEach(function (oChange) {
+
+                    if (oChange.response) {
+                        if (parseInt(oChange.response.statusCode, 10) >= 400) {
+                            bHasError = true;
+                        }
                     }
-                    return oBatch.response && parseInt(oBatch.response.statusCode, 10) >= 400;
+
+                    //  ALSO CHECK MESSAGE BODY
+                    if (oChange.response && oChange.response.body) {
+                        if (oChange.response.body.includes("error")) {
+                            bHasError = true;
+                        }
+                    }
+
                 });
+
             }
+
+        });
+    }
+
 
             if (bHasError) {
                 sap.m.MessageBox.error("Error creating warehouse assignment.");
@@ -1543,7 +1572,7 @@ onCreateFieldChange: function (oEvent) {
             return true;
         },
 
-        applyMassChange: function () {
+       applyMassChange: async function () {
             var oModel = this.getView().getModel();
             var aSelectedItems = this.table.getSelectedItems();
             var oDialogObject = oModel.getProperty(this.oContextNewEntry.sPath);
@@ -1579,7 +1608,8 @@ onCreateFieldChange: function (oEvent) {
                 "WeightIndicator",
                 "VolumeIndicator",
                 "WidthIndicator",
-                "HeightIndicator"
+                "HeightIndicator",
+                "LengthIndicator"
             ];
 
             aSelectedItems.forEach(function (oItem) {
@@ -1592,15 +1622,24 @@ onCreateFieldChange: function (oEvent) {
                 }.bind(this));
             }.bind(this));
 
-            this.deleteModelEntry(this.oContextNewEntry);
-            this.oContextNewEntry = null;
+            
+this.deleteModelEntry(this.oContextNewEntry);
+this.oContextNewEntry = null;
 
-            if (this.oMassDialog) {
-                this.oMassDialog.close();
-            }
+if (this.oMassDialog) {
+    this.oMassDialog.close();
+}
 
-            this.onSaveData();
-            this._validateAllConfiguredVHFieldsBeforeSave();    
+var bSuccess = await this.onSaveData();
+
+if (!bSuccess) {
+    return;
+}
+
+if (!bValid) {
+    console.log(" INVALID FIELD:", oCfg.fieldPath, sValue);
+}
+
 
         },
 
