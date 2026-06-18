@@ -107,6 +107,8 @@ oTable.attachUpdateFinished(function () {
 
     this._scheduleRowViewSetup();
     this._wireGenericVHValidation();
+    this._forceAllColumnsVisible();
+    this._forceSelectAllColumnsInPerso();
 
     setTimeout(function () {
         this._applyEntitledReadOnly();
@@ -304,6 +306,25 @@ var fnApplyWarehouseFilter = function () {
 
 },
 
+_forceSelectAllColumnsInPerso: function () {
+
+    var oSmartTable = this.byId("LineItemsSmartTable");
+    var oPersController = oSmartTable && oSmartTable._oPersController;
+
+    if (!oPersController) return;
+
+    var oState = oPersController.getCurrentState();
+
+    if (!oState || !oState.columns) return;
+
+    oState.columns.forEach(function (oCol) {
+        oCol.visible = true;   //  force selected
+    });
+
+    oPersController.setCurrentState(oState);
+
+    console.log("All columns forced selected in personalization");
+},
 
 _getVhValidationConfig: function () {
     return [
@@ -902,6 +923,22 @@ _lockVHInputs: function () {
     }.bind(this));
 },
 
+
+_forceAllColumnsVisible: function () {
+
+    var oSmartTable = this.byId("LineItemsSmartTable");
+    var oTable = oSmartTable && oSmartTable.getTable();
+
+    if (!oTable) return;
+
+    var aColumns = oTable.getColumns();
+
+    aColumns.forEach(function (oColumn) {
+        oColumn.setVisible(true);
+    });
+
+    console.log("All columns forced visible");
+},
 
 _validateVHField: function (oInput, sWarehouseNo, oCfg) {
 

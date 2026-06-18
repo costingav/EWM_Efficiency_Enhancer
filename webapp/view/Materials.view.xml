@@ -21,7 +21,7 @@
 <smartFilterBar:SmartFilterBar
     id="smartFilterBar"
     entitySet="ZEWM_C_MATERIAL"
-  persistencyKey="SmartTableAnalytical_Explored_V4_FILTERS5"
+  persistencyKey="SmartTableAnalytical_Explored_V10_FILTERS5"
     enableBasicSearch="true">
 
     <smartFilterBar:controlConfiguration>
@@ -129,7 +129,7 @@
                     enableExport="true"
                     beforeExport="onBeforeExport"
                     showRowCount="true"
-                    persistencyKey="SmartTableAnalytical_Explored_V5"
+                    persistencyKey="SmartTableAnalytical_Explored_V10"
                     class="sapUiResponsiveContentPadding"
                     enableAutoColumnWidth="true"
                     editTogglable="true"
