@@ -10,66 +10,64 @@ sap.ui.define([
 
     return Controller.extend("bearingpoint.ewm.materialmaintenance.controller.Materials", {
 
+
 onInit: function () {
     var oView = this.getView();
-
     var oModel = oView.getModel();
 
-if (oModel) {
-    oModel.setDefaultBindingMode(sap.ui.model.BindingMode.TwoWay);
-} else {
-    oView.attachEventOnce("modelContextChange", function () {
-        var oModelLater = this.getView().getModel();
-        if (oModelLater) {
-            oModelLater.setDefaultBindingMode(sap.ui.model.BindingMode.TwoWay);
-        }
-    }.bind(this));
-}
+    if (oModel) {
+        oModel.setDefaultBindingMode(sap.ui.model.BindingMode.TwoWay);
+    } else {
+        oView.attachEventOnce("modelContextChange", function () {
+            var oModelLater = this.getView().getModel();
+            if (oModelLater) {
+                oModelLater.setDefaultBindingMode(sap.ui.model.BindingMode.TwoWay);
+            }
+        }.bind(this));
+    }
 
     var oSmartTable = oView.byId("LineItemsSmartTable");
     var oSmartFilterBar = oView.byId("smartFilterBar");
 
+    if (oSmartFilterBar) {
+        oSmartFilterBar.attachSearch(function () {
 
-if (oSmartFilterBar) {
-    oSmartFilterBar.attachSearch(function () {
+            var aInvalidFields = [];
 
-        var aInvalidFields = [];
+            oSmartFilterBar.getAllFilterItems().forEach(function (oItem) {
 
-        oSmartFilterBar.getAllFilterItems().forEach(function (oItem) {
+                var oControl = oItem.getControl();
+                if (!oControl) {
+                    return;
+                }
 
-            var oControl = oItem.getControl();
-            if (!oControl) {
-                return;
+                var sValue = "";
+
+                if (oControl.getValue) {
+                    sValue = oControl.getValue();
+                } else if (oControl.getSelectedKey) {
+                    sValue = oControl.getSelectedKey();
+                }
+
+                // check invalid length (generic safety)
+                if (sValue && sValue.length > 4) {
+                    oControl.setValue("");
+                    oControl.setSelectedKey && oControl.setSelectedKey("");
+
+                    aInvalidFields.push(oItem.getLabel());
+                }
+
+            });
+
+            // User feedback (clean UX)
+            if (aInvalidFields.length > 0) {
+                sap.m.MessageToast.show(
+                    "Some filters were cleared because of invalid values."
+                );
             }
 
-            var sValue = "";
-
-            if (oControl.getValue) {
-                sValue = oControl.getValue();
-            } else if (oControl.getSelectedKey) {
-                sValue = oControl.getSelectedKey();
-            }
-
-            //  check invalid length (generic safety)
-            if (sValue && sValue.length > 4) {
-                oControl.setValue("");
-                oControl.setSelectedKey && oControl.setSelectedKey("");
-
-                aInvalidFields.push(oItem.getLabel());
-            }
-
-        });
-
-        //  User feedback (clean UX)
-        if (aInvalidFields.length > 0) {
-            sap.m.MessageToast.show(
-                "Some filters were cleared because of invalid values."
-            );
-        }
-
-    }.bind(this));
-}
-
+        }.bind(this));
+    }
 
     // ===============================
     // View model
@@ -87,9 +85,8 @@ if (oSmartFilterBar) {
         var oTable = oSmartTable.getTable();
         this.table = oTable;
 
-this.getView().byId("_IDGenButton").setEnabled(false);
-this.getView().byId("_MassChange").setEnabled(false);
-
+        this.getView().byId("_IDGenButton").setEnabled(false);
+        this.getView().byId("_MassChange").setEnabled(false);
 
         if (oTable) {
 
@@ -99,36 +96,24 @@ this.getView().byId("_MassChange").setEnabled(false);
 
             oTable.attachSelectionChange(this.onTableSelectionChange.bind(this));
 
-var oTable = this.table;
-
             if (oTable.attachUpdateFinished) {
-                
-oTable.attachUpdateFinished(function () {
+                oTable.attachUpdateFinished(function () {
 
-    this._scheduleRowViewSetup();
-    this._wireGenericVHValidation();
-    this._forceAllColumnsVisible();
-    this._forceSelectAllColumnsInPerso();
+                    this._scheduleRowViewSetup();
+                    this._wireGenericVHValidation();
+                    this._forceAllColumnsVisible();
+                    this._forceSelectAllColumnsInPerso();
 
-    setTimeout(function () {
-        this._applyEntitledReadOnly();
-    }.bind(this), 200);
+                    setTimeout(function () {
+                        this._applyEntitledReadOnly();
+                    }.bind(this), 200);
 
-   
-    if (this.table && this.table.removeSelections) {
-        this.table.removeSelections(true);
-    }
-
-    this.onTableSelectionChange();
-
-}.bind(this));
-
+                }.bind(this));
             }
         }
 
         this._scheduleRowViewSetup();
 
-        //  IMPORTANT: apply after init render
         setTimeout(function () {
             this._applyEntitledReadOnly();
         }.bind(this), 200);
@@ -141,14 +126,13 @@ oTable.attachUpdateFinished(function () {
     oView.addEventDelegate({
         onAfterShow: function () {
 
-if (oSmartFilterBar) {
-    oSmartFilterBar.clear();
-}
+            if (oSmartFilterBar) {
+                oSmartFilterBar.clear();
+            }
 
             this._scheduleRowViewSetup();
             this._wireGenericVHValidation();
 
-            //  IMPORTANT: ensure binding ready
             setTimeout(function () {
                 this._applyEntitledReadOnly();
             }.bind(this), 200);
@@ -156,175 +140,198 @@ if (oSmartFilterBar) {
         }.bind(this)
     });
 
+    // ===============================
+    // ValueHelpDialog patch
+    // ===============================
+    if (oSmartFilterBar && !this._vhPatched) {
+        this._vhPatched = true;
 
+        var fnOrigAfterRendering = ValueHelpDialog.prototype.onAfterRendering;
 
+        ValueHelpDialog.prototype.onAfterRendering = function () {
 
-// ===============================
-// ValueHelpDialog patch
-// ===============================
-if (oSmartFilterBar && !this._vhPatched) {
-    this._vhPatched = true;
-
-    var fnOrigAfterRendering = ValueHelpDialog.prototype.onAfterRendering;
-
-    ValueHelpDialog.prototype.onAfterRendering = function () {
-
-        if (fnOrigAfterRendering) {
-            fnOrigAfterRendering.apply(this, arguments);
-        }
-
-        var oDialog = this;
-
-        setTimeout(function () {
-
-            try {
-                if (!oDialog || !oDialog.isA("sap.ui.comp.valuehelpdialog.ValueHelpDialog")) {
-                    return;
-                }
-
-                var oTable = oDialog.getTable && oDialog.getTable();
-                if (!oTable) {
-                    return;
-                }
-
-                if (oTable.isA && oTable.isA("sap.m.Table")) {
-                    oTable.setMode("MultiSelect");
-                }
-
-
-
-var fnApplyWarehouseFilter = function () {
-
-    var oBinding = oTable.getBinding("items") || oTable.getBinding("rows");
-    if (!oBinding) {
-        return;
-    }
-
-    //  Always get warehouse from selected row in main table
-    var oMainTable = sap.ui.getCore().byId("application-bearpoint...---Materials--_IDGenTable");
-    
-    var sWarehouseNo = "";
-
-    if (oMainTable && oMainTable.getSelectedItems) {
-        var aSelected = oMainTable.getSelectedItems();
-        if (aSelected.length) {
-            var oCtx = aSelected[0].getBindingContext();
-            if (oCtx) {
-                sWarehouseNo = oCtx.getProperty("WarehouseNo");
+            if (fnOrigAfterRendering) {
+                fnOrigAfterRendering.apply(this, arguments);
             }
-        }
-    }
 
-    // fallback: first visible row
-    if (!sWarehouseNo && oMainTable && oMainTable.getItems) {
-        var aItems = oMainTable.getItems();
-        if (aItems.length) {
-            var oCtx = aItems[0].getBindingContext();
-            if (oCtx) {
-                sWarehouseNo = oCtx.getProperty("WarehouseNo");
-            }
-        }
-    }
+            var oDialog = this;
 
-    console.log("VH FILTER WarehouseNo =", sWarehouseNo);
-
-    if (sWarehouseNo) {
-        oBinding.filter([
-            new sap.ui.model.Filter(
-                "WarehouseNo",
-                sap.ui.model.FilterOperator.EQ,
-                sWarehouseNo
-            )
-        ]);
-    } else {
-        oBinding.filter([]);
-    }
-};
-
-
-
-
-                var fnHideLgnum = function () {
-                    var aCols = oTable.getColumns ? oTable.getColumns() : [];
-                    var aItems = oTable.getItems
-                        ? oTable.getItems()
-                        : (oTable.getRows ? oTable.getRows() : []);
-
-                    if (!aItems.length) {
-                        aCols.forEach(function (oCol) {
-                            var oHeader = oCol.getHeader && oCol.getHeader();
-                            var sHeader = oHeader && oHeader.getText && oHeader.getText();
-
-                            if (sHeader && sHeader.toLowerCase().includes("warehouse")) {
-                                oCol.setVisible(false);
-                            }
-                        });
+            setTimeout(function () {
+                try {
+                    if (!oDialog || !oDialog.isA("sap.ui.comp.valuehelpdialog.ValueHelpDialog")) {
                         return;
                     }
 
-                    var aCells = aItems[0].getCells ? aItems[0].getCells() : [];
+                    var oTable = oDialog.getTable && oDialog.getTable();
+                    if (!oTable) {
+                        return;
+                    }
 
-                    aCols.forEach(function (oCol, i) {
-                        if (!aCells[i]) {
+                    if (oTable.isA && oTable.isA("sap.m.Table")) {
+                        oTable.setMode("MultiSelect");
+                    }
+
+                    var fnApplyWarehouseFilter = function () {
+
+                        var oBinding = oTable.getBinding("items") || oTable.getBinding("rows");
+                        if (!oBinding) {
                             return;
                         }
 
-                        var oBinding = aCells[i].getBinding && aCells[i].getBinding("text");
-                        var sPath = oBinding && oBinding.getPath && oBinding.getPath();
+                        var sTitle = oDialog.getTitle && oDialog.getTitle();
+                        var sWarehouseNo = "";
 
-                        if (sPath && sPath.toLowerCase().includes("lgnum")) {
-                            oCol.setVisible(false);
+                        // 1) FIRST TRY: warehouse from CREATE dialog field
+                        var oWarehouseDialogInput = sap.ui.getCore().byId(
+                            oDialog.getId && (oDialog.getId() + "--warehouseNo")
+                        ) || sap.ui.getCore().byId("warehouseNo");
+
+                        if (oWarehouseDialogInput && oWarehouseDialogInput.getValue) {
+                            sWarehouseNo = oWarehouseDialogInput.getValue() || "";
                         }
-                    });
-                };
 
-                fnApplyWarehouseFilter();
-                fnHideLgnum();
+                        // 2) FALLBACK: warehouse from selected row in main table
+                        if (!sWarehouseNo) {
+                            var oMainTable = sap.ui.getCore().byId("application-bearpoint...---Materials--_IDGenTable");
 
-                if (oTable.attachUpdateFinished) {
-                    if (oDialog._vhUpdateHandler) {
-                        oTable.detachUpdateFinished(oDialog._vhUpdateHandler);
-                    }
+                            if (oMainTable && oMainTable.getSelectedItems) {
+                                var aSelected = oMainTable.getSelectedItems();
+                                if (aSelected.length) {
+                                    var oCtx = aSelected[0].getBindingContext();
+                                    if (oCtx) {
+                                        sWarehouseNo = oCtx.getProperty("WarehouseNo") || "";
+                                    }
+                                }
+                            }
 
-                    oDialog._vhUpdateHandler = function () {
-                        fnApplyWarehouseFilter();
-                        fnHideLgnum();
+                            if (!sWarehouseNo && oMainTable && oMainTable.getItems) {
+                                var aItems = oMainTable.getItems();
+                                if (aItems.length) {
+                                    var oCtx2 = aItems[0].getBindingContext();
+                                    if (oCtx2) {
+                                        sWarehouseNo = oCtx2.getProperty("WarehouseNo") || "";
+                                    }
+                                }
+                            }
+                        }
+
+                        console.log("VH FILTER WarehouseNo =", sWarehouseNo, "Dialog title =", sTitle);
+
+                        var sWarehouseField = "Lgnum";
+
+                        if (sTitle && (
+                            sTitle.indexOf("Storage Bin") !== -1 ||
+                            sTitle.indexOf("Proc.Type Det.") !== -1 ||
+                            sTitle.indexOf("Process Block") !== -1 ||
+                            sTitle.indexOf("Prod. Load") !== -1 ||
+                            sTitle.indexOf("Stk Determin.") !== -1
+                        )) {
+                            sWarehouseField = "WarehouseNo";
+                        }
+
+                        if (sTitle && sTitle.indexOf("Default Pty") !== -1) {
+                            sWarehouseField = "Lgnum";
+                        }
+
+                        if (sWarehouseNo) {
+                            oBinding.filter([
+                                new sap.ui.model.Filter(
+                                    sWarehouseField,
+                                    sap.ui.model.FilterOperator.EQ,
+                                    sWarehouseNo
+                                )
+                            ]);
+                        } else {
+                            oBinding.filter([]);
+                        }
                     };
 
-                    oTable.attachUpdateFinished(oDialog._vhUpdateHandler);
+                    var fnHideLgnum = function () {
+                        var aCols = oTable.getColumns ? oTable.getColumns() : [];
+                        var aItems = oTable.getItems
+                            ? oTable.getItems()
+                            : (oTable.getRows ? oTable.getRows() : []);
+
+                        if (!aItems.length) {
+                            aCols.forEach(function (oCol) {
+                                var oHeader = oCol.getHeader && oCol.getHeader();
+                                var sHeader = oHeader && oHeader.getText && oHeader.getText();
+
+                                if (sHeader && sHeader.toLowerCase().includes("warehouse")) {
+                                    oCol.setVisible(false);
+                                }
+                            });
+                            return;
+                        }
+
+                        var aCells = aItems[0].getCells ? aItems[0].getCells() : [];
+
+                        aCols.forEach(function (oCol, i) {
+                            if (!aCells[i]) {
+                                return;
+                            }
+
+                            var oBinding = aCells[i].getBinding && aCells[i].getBinding("text");
+                            var sPath = oBinding && oBinding.getPath && oBinding.getPath();
+
+                            if (sPath && sPath.toLowerCase().includes("lgnum")) {
+                                oCol.setVisible(false);
+                            }
+                        });
+                    };
+
+                    fnApplyWarehouseFilter();
+                    fnHideLgnum();
+
+                    if (oTable.attachUpdateFinished) {
+                        if (oDialog._vhUpdateHandler) {
+                            oTable.detachUpdateFinished(oDialog._vhUpdateHandler);
+                        }
+
+                        oDialog._vhUpdateHandler = function () {
+                            fnApplyWarehouseFilter();
+                            fnHideLgnum();
+                        };
+
+                        oTable.attachUpdateFinished(oDialog._vhUpdateHandler);
+                    }
+
+                } catch (e) {
+                    console.log("VH patch error:", e);
                 }
-
-            } catch (e) {
-                console.log("VH patch error:", e);
-            }
-
-        }, 300);
-    };
-
+            }, 300);
+        };
+    
 
 }
 
 },
 
-_forceSelectAllColumnsInPerso: function () {
 
+_forceSelectAllColumnsInPerso: function () {
     var oSmartTable = this.byId("LineItemsSmartTable");
     var oPersController = oSmartTable && oSmartTable._oPersController;
 
-    if (!oPersController) return;
+    if (!oPersController ||
+        typeof oPersController.getCurrentState !== "function" ||
+        typeof oPersController.setCurrentState !== "function") {
+        return;
+    }
 
     var oState = oPersController.getCurrentState();
 
-    if (!oState || !oState.columns) return;
+    if (!oState || !oState.columns) {
+        return;
+    }
 
     oState.columns.forEach(function (oCol) {
-        oCol.visible = true;   //  force selected
+        oCol.visible = true;
     });
 
     oPersController.setCurrentState(oState);
-
-    console.log("All columns forced selected in personalization");
 },
+
+
 
 _getVhValidationConfig: function () {
     return [
@@ -708,6 +715,14 @@ onSaveData: async function () {
         oModel.submitChanges({
 
             success: function (oResponse) {
+            console.log(" BATCH RESPONSE:", oResponse);
+
+
+if (oResponse && oResponse.__batchResponses && oResponse.__batchResponses.length > 0) {
+    var aChanges = oResponse.__batchResponses[0].__changeResponses;
+    console.log(" CHANGE RESPONSES:", aChanges);
+    console.log("COUNT:", aChanges ? aChanges.length : 0);
+}
 
                 var bHasError = false;
 
@@ -1511,6 +1526,7 @@ _isExistingWarehouseCombination: function (sMaterialId, sWarehouseNo, sEntitled)
         // CREATE ASSIGNMENT
         // =========================================================
         
+
 onCreate: function () {
     var that = this;
 
@@ -1519,34 +1535,136 @@ onCreate: function () {
             name: "bearingpoint.ewm.materialmaintenance.view.fragments.Create"
         }).then(function (oDialog) {
 
-            //  Always recreate template fresh
             that.oContextNewEntry = that.createNewEntry();
-
             that.getView().byId("sfCreate").setBindingContext(that.oContextNewEntry);
+
+            
+            that.getView().byId("entitled").setEditable(false);
 
             that.oDialog = oDialog;
             oDialog.open();
         });
     } else {
-
-        //  recreate EVERY TIME dialog is opened
         this.oContextNewEntry = this.createNewEntry();
-
         this.getView().byId("sfCreate").setBindingContext(this.oContextNewEntry);
+
+        
+        this.getView().byId("entitled").setEditable(false);
 
         this.oDialog.open();
     }
 },
 
 
-        onChangeWH: function () {
-            var sWarehouseNo = this.getView().byId("warehouseNo").getValue();
+onChangeWH: function () {
+    var oModel = this.getView().getModel();
+    var oWarehouseInput = this.getView().byId("warehouseNo");
+    var oEntitledSmartField = this.getView().byId("entitled");
 
-            if (sWarehouseNo) {
-                this.getView().getModel().setProperty("WarehouseNo", sWarehouseNo, this.oContextNewEntry);
-                this.getView().byId("warehouseNo").setValueState(sap.ui.core.ValueState.None);
+    var sWarehouseNo = oWarehouseInput && oWarehouseInput.getValue
+        ? (oWarehouseInput.getValue() || "").trim()
+        : "";
+
+    if (!sWarehouseNo || !this.oContextNewEntry) {
+        return;
+    }
+
+    // 1) write selected warehouse into dialog context
+    oModel.setProperty("WarehouseNo", sWarehouseNo, this.oContextNewEntry);
+
+    // 2) clear current entitled values before re-reading
+    oModel.setProperty("Entitled", "", this.oContextNewEntry);
+    oModel.setProperty("EntitledId", "", this.oContextNewEntry);
+    oModel.checkUpdate(true);
+
+    // 3) clear UI + temporarily lock field
+    if (oEntitledSmartField) {
+        oEntitledSmartField.setEditable(false);
+
+        var aInnerBefore = oEntitledSmartField.getInnerControls && oEntitledSmartField.getInnerControls();
+        var oInnerBefore = aInnerBefore && aInnerBefore.length ? aInnerBefore[0] : null;
+
+        if (oInnerBefore && oInnerBefore.setValue) {
+            oInnerBefore.setValue("");
+        } else if (oEntitledSmartField.setValue) {
+            oEntitledSmartField.setValue("");
+        }
+
+        oEntitledSmartField.setValueState("None");
+        oEntitledSmartField.setValueStateText("");
+    }
+
+    console.log("Warehouse selected:", sWarehouseNo);
+
+    // 4) read entitled values for selected warehouse
+    oModel.read("/ZEWM_I_ENTITLEDVH", {
+        filters: [
+            new sap.ui.model.Filter(
+                "Lgnum",   
+                sap.ui.model.FilterOperator.EQ,
+                sWarehouseNo
+            )
+        ],
+
+        success: function (oData) {
+            if (!oData || !oData.results || !oData.results.length) {
+                console.log("No entitled found for warehouse:", sWarehouseNo);
+                return;
             }
-        },
+
+            var oResult = oData.results[0];
+            console.log("ENTITLED VH first result:", oResult);
+
+            //  robust mapping in case field names differ slightly
+            var sEntitled =
+                oResult.Entitled ||
+                oResult.DefaultPtyEntitlId ||
+                oResult.DefaultPtyEntitled ||
+                oResult.Partner ||
+                "";
+
+            var sEntitledId =
+                oResult.EntitledId ||
+                oResult.DefaultPtyEntitlIdGuid ||
+                oResult.PartnerGuid ||
+                "";
+
+            console.log("Resolved Entitled from backend:", sEntitled, sEntitledId);
+
+            // 5) write to model
+            oModel.setProperty("Entitled", sEntitled, this.oContextNewEntry);
+            oModel.setProperty("EntitledId", sEntitledId, this.oContextNewEntry);
+            oModel.checkUpdate(true);
+
+            // 6) force UI update of the SmartField
+            if (oEntitledSmartField) {
+                var aInner = oEntitledSmartField.getInnerControls && oEntitledSmartField.getInnerControls();
+                var oInnerInput = aInner && aInner.length ? aInner[0] : null;
+
+                if (oInnerInput && oInnerInput.setValue) {
+                    oInnerInput.setValue(sEntitled);
+                } else if (oEntitledSmartField.setValue) {
+                    oEntitledSmartField.setValue(sEntitled);
+                }
+
+                oEntitledSmartField.setEditable(true);
+                oEntitledSmartField.setValueState("None");
+                oEntitledSmartField.setValueStateText("");
+            }
+        }.bind(this),
+
+        error: function (oError) {
+            console.log("Failed to resolve Entitled from warehouse", oError);
+
+            if (oEntitledSmartField) {
+                oEntitledSmartField.setEditable(true);
+                oEntitledSmartField.setValueState("Error");
+                oEntitledSmartField.setValueStateText("No entitled found for selected warehouse");
+            }
+        }.bind(this)
+    });
+},
+
 
         onChangeEntitled: function () {
             var sEntitled = this.getView().byId("entitled").getValue();
@@ -1608,6 +1726,7 @@ if (!this.oContextNewEntry) {
     // 2) Keep dialog values before deleting temp row
     // --------------------------------------------
     var oTemplate = Object.assign({}, oDialogObject);
+    delete oTemplate.DemandQuantity;
 
     // remove the temporary dialog entry so it does not get submitted as a single fake create
     this.deleteModelEntry(this.oContextNewEntry);
@@ -1631,56 +1750,63 @@ if (this._isExistingWarehouseCombination(
     return;
 }
 
-        oModel.createEntry("/ZEWM_C_MATERIAL", {
-            properties: {
-                // identity from selected source row
-                MaterialId: oSource.MaterialId || "",
-                MaterialNumber: oSource.MaterialNumber || "",
-                MaterialDesc: oSource.MaterialDesc || "",
+var mProps = {
+    MaterialId: oSource.MaterialId || "",
+    MaterialNumber: oSource.MaterialNumber || "",
+    MaterialDesc: oSource.MaterialDesc || "",
 
-                // target combination from dialog
-                WarehouseNo: oTemplate.WarehouseNo || "",
-                Entitled: oTemplate.Entitled || "",
+    WarehouseNo: oTemplate.WarehouseNo || "",
+    Entitled: oTemplate.Entitled || "",
 
-                // keep source GUIDs if present, else fallback zero GUID
-               
-EntitledId: oSource.EntitledId || "",
-Scuguid: oSource.Scuguid || "",
+    PutawayControl: oTemplate.PutawayControl || "",
+    StorSectInd: oTemplate.StorSectInd || "",
+    StockRemovalCtrl: oTemplate.StockRemovalCtrl || "",
+    BulkStorage: oTemplate.BulkStorage || "",
+
+    ProcBlockProfile: oTemplate.ProcBlockProfile || "",
+    CtrlIndicatorProcessType: oTemplate.CtrlIndicatorProcessType || "",
+    ProductLoadCategory: oTemplate.ProductLoadCategory || "",
+    CycleCountingIndicator: oTemplate.CycleCountingIndicator || "",
+
+    MinShelfLife: oTemplate.MinShelfLife || 0,
+    QuantityClassMerchandiseDistr: oTemplate.QuantityClassMerchandiseDistr || "",
+    PrefferedAltUoMforWarehouseOp: oTemplate.PrefferedAltUoMforWarehouseOp || "",
+    QualityInspectionGroup: oTemplate.QualityInspectionGroup || "",
+    StorageBinType: oTemplate.StorageBinType || "",
+    StockDeterminationGroup: oTemplate.StockDeterminationGroup || "",
+    RelevanceForTwoStepPicking: oTemplate.RelevanceForTwoStepPicking || "",
+    StagingAreaDoorDetGroup: oTemplate.StagingAreaDoorDetGroup || "",
+
+    NumberOfSalesOrderItems: oTemplate.NumberOfSalesOrderItems || 0,
+    RecommendedStorageQuantity: oTemplate.RecommendedStorageQuantity || 0,
+
+    DimentioRatio: oTemplate.DimentioRatio || 0,
+    WeightIndicator: oTemplate.WeightIndicator || "",
+    VolumeIndicator: oTemplate.VolumeIndicator || "",
+    LengthIndicator: oTemplate.LengthIndicator || "",
+    WidthIndicator: oTemplate.WidthIndicator || "",
+    HeightIndicator: oTemplate.HeightIndicator || ""
+};
+
+//  ONLY send GUID/key fields if they really exist
+if (oTemplate.EntitledId) {
+    mProps.EntitledId = oTemplate.EntitledId;
+}
+
+if (oTemplate.Scuguid) {
+    mProps.Scuguid = oTemplate.Scuguid;
+} else if (oSource.Scuguid) {
+    mProps.Scuguid = oSource.Scuguid;
+}
 
 
-                // values from dialog template (apply same entered values to all selected materials)
-                PutawayControl: oTemplate.PutawayControl || "",
-                StorSectInd: oTemplate.StorSectInd || "",
-                StockRemovalCtrl: oTemplate.StockRemovalCtrl || "",
-                BulkStorage: oTemplate.BulkStorage || "",
+// ONLY send supported fields
+delete mProps.DemandQuantity;
 
-                ProcBlockProfile: oTemplate.ProcBlockProfile || "",
-                CtrlIndicatorProcessType: oTemplate.CtrlIndicatorProcessType || "",
-                ProductLoadCategory: oTemplate.ProductLoadCategory || "",
-                CycleCountingIndicator: oTemplate.CycleCountingIndicator || "",
-
-                MinShelfLife: oTemplate.MinShelfLife || 0,
-                QuantityClassMerchandiseDistr: oTemplate.QuantityClassMerchandiseDistr || "",
-                PrefferedAltUoMforWarehouseOp: oTemplate.PrefferedAltUoMforWarehouseOp || "",
-                QualityInspectionGroup: oTemplate.QualityInspectionGroup || "",
-                StorageBinType: oTemplate.StorageBinType || "",
-                StockDeterminationGroup: oTemplate.StockDeterminationGroup || "",
-                RelevanceForTwoStepPicking: oTemplate.RelevanceForTwoStepPicking || "",
-                StagingAreaDoorDetGroup: oTemplate.StagingAreaDoorDetGroup || "",
-
-                NumberOfSalesOrderItems: oTemplate.NumberOfSalesOrderItems || 0,
-            
-               
-
-                DimentioRatio: oTemplate.DimentioRatio || 0,
-                WeightIndicator: oTemplate.WeightIndicator || "",
-                VolumeIndicator: oTemplate.VolumeIndicator || "",
-                LengthIndicator: oTemplate.LengthIndicator || "",
-                WidthIndicator: oTemplate.WidthIndicator || "",
-                HeightIndicator: oTemplate.HeightIndicator || ""
-            }
-        });
-
+oModel.createEntry("/ZEWM_C_MATERIAL", {
+    properties: mProps
+});
+console.log("CREATING FOR MATERIAL:", oSource.MaterialNumber, oSource.MaterialId);
         iCreated++;
     }.bind(this));
 
