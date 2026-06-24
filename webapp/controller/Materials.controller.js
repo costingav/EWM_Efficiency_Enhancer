@@ -109,9 +109,14 @@ oTable.attachUpdateFinished(function () {
     this._scheduleRowViewSetup();
 
     //  Delay once to allow SmartFields to fully render
-    setTimeout(function () {
-        this._wireGenericVHValidation();
-    }.bind(this), 300);
+    
+
+setTimeout(function () {
+    this._wireGenericVHValidation();
+    this._wireNumericValidation();
+}.bind(this), 600);
+
+
 
     this._forceAllColumnsVisible();
     this._forceSelectAllColumnsInPerso();
@@ -135,27 +140,30 @@ oTable.attachUpdateFinished(function () {
     // ===============================
     // Page navigation hook
     // ===============================
-    oView.addEventDelegate({
-        onAfterShow: function () {
+   
+oView.addEventDelegate({
+    onAfterShow: function () {
 
-            if (oSmartFilterBar) {
-                oSmartFilterBar.clear();
-            }
+        if (oSmartFilterBar) {
+            oSmartFilterBar.clear();
+        }
 
-            
-this._scheduleRowViewSetup();
+        this._scheduleRowViewSetup();
 
+       
 setTimeout(function () {
     this._wireGenericVHValidation();
-}.bind(this), 300);
-
-setTimeout(function () {
-    this._applyEntitledReadOnly();
-}.bind(this), 200);
+    this._wireNumericValidation();
+}.bind(this), 600);
 
 
-        }.bind(this)
-    });
+        setTimeout(function () {
+            this._applyEntitledReadOnly();
+        }.bind(this), 200);
+
+    }.bind(this)
+});
+
 
     // ===============================
     // ValueHelpDialog patch
@@ -205,46 +213,55 @@ if (sTitle && sTitle.toLowerCase().includes("warehouse")) {
         return;
     }
 
-    var sWarehouseNo = "";
+    
 
-    // 1) Try create dialog field first
-    var oWarehouseDialogInput = sap.ui.getCore().byId(
-        oDialog.getId && (oDialog.getId() + "--warehouseNo")
-    ) || sap.ui.getCore().byId("warehouseNo");
+var sWarehouseNo = "";
 
-    if (oWarehouseDialogInput && oWarehouseDialogInput.getValue) {
-        sWarehouseNo = oWarehouseDialogInput.getValue() || "";
-    }
+// 1) Create / Extend dialog warehouse input has priority
 
-    // 2) Try main table directly from current view (best for inline edit VH)
-    if (!sWarehouseNo) {
-        var oMainTable = oController.byId("_IDGenTable");
+var oWarehouseDialogInput = null;
 
-        if (oMainTable && oMainTable.getSelectedItems) {
-            var aSelected = oMainTable.getSelectedItems();
-            if (aSelected.length) {
-                var oCtx = aSelected[0].getBindingContext();
-                if (oCtx) {
-                    sWarehouseNo = oCtx.getProperty("WarehouseNo") || "";
-                }
+if (oController.oDialog && oController.oDialog.isOpen && oController.oDialog.isOpen()) {
+    oWarehouseDialogInput =
+        sap.ui.getCore().byId(oController.oDialog.getId() + "--warehouseNo") ||
+        sap.ui.getCore().byId("warehouseNo");
+}
+
+if (oWarehouseDialogInput && oWarehouseDialogInput.getValue) {
+    sWarehouseNo = oWarehouseDialogInput.getValue() || "";
+}
+
+
+// 2) Inline edit / row VH must use the row that opened the VH
+if (!sWarehouseNo && oController._lastVhContext && oController._lastVhContext.warehouseNo) {
+    sWarehouseNo = oController._lastVhContext.warehouseNo;
+}
+console.log("LAST VH CONTEXT USED:", oController._lastVhContext);
+
+
+// 3) Mass Change fallback → use selected rows warehouse
+if (!sWarehouseNo && oController.oMassDialog && oController.oMassDialog.isOpen && oController.oMassDialog.isOpen()) {
+
+    var oMainTable = oController.byId("_IDGenTable");
+
+    if (oMainTable && oMainTable.getSelectedItems) {
+
+        var aSelected = oMainTable.getSelectedItems();
+
+        if (aSelected.length > 0) {
+
+            var oCtx = aSelected[0].getBindingContext();
+
+            if (oCtx) {
+                sWarehouseNo = oCtx.getProperty("WarehouseNo") || "";
             }
         }
-
-        // 3) Fallback: first visible row that has a warehouse
-        if (!sWarehouseNo && oMainTable && oMainTable.getItems) {
-            var aItems = oMainTable.getItems();
-            for (var i = 0; i < aItems.length; i++) {
-                var oCtx2 = aItems[i].getBindingContext && aItems[i].getBindingContext();
-                if (oCtx2) {
-                    var sWh = oCtx2.getProperty("WarehouseNo") || "";
-                    if (sWh) {
-                        sWarehouseNo = sWh;
-                        break;
-                    }
-                }
-            }
-        }
     }
+}
+
+// 4) Do NOT fallback to first visible row
+// If no context is known, leave VH unfiltered
+
 
     console.log("VH FILTER WarehouseNo =", sWarehouseNo, "Dialog title =", sTitle);
 
@@ -253,16 +270,22 @@ if (sTitle && sTitle.toLowerCase().includes("warehouse")) {
 var sWarehouseField = "Lgnum";
 
 // These known VHs use WarehouseNo instead
+
+
 if (sTitle && (
     sTitle.indexOf("Storage Bin") !== -1 ||
     sTitle.indexOf("Proc.Type Det.") !== -1 ||
     sTitle.indexOf("Process Block") !== -1 ||
     sTitle.indexOf("Prod. Load") !== -1 ||
     sTitle.indexOf("Stk Determin.") !== -1 ||
-    sTitle.indexOf("Cyc. Coun.") !== -1
+    sTitle.indexOf("Cyc. Coun.") !== -1 ||
+    sTitle.indexOf("StagArea") !== -1 ||
+    sTitle.indexOf("DoorDet") !== -1
 )) {
     sWarehouseField = "WarehouseNo";
 }
+
+
 
 if (sTitle && sTitle.indexOf("Default Pty") !== -1) {
     sWarehouseField = "Lgnum";
@@ -426,6 +449,19 @@ _forceSelectAllColumnsInPerso: function () {
 
 _getVhValidationConfig: function () {
     return [
+{
+    fieldPath: "StagingAreaDoorDetGroup",
+    headerText: "StagArea/DoorDet Grp",
+    entitySet: "/ZEWM_I_DRDETGRVH",
+    valueFieldCandidates: [
+        "StagingAreaDoorDetGroup",
+        "Drdetgr",
+        "DRDETGR"
+    ],
+    message: "Invalid Door Determination Group for this Warehouse. Use Value Help."
+},
+
+
         {
             fieldPath: "StorageBinType",
             headerText: "Storage Bin",
@@ -607,6 +643,309 @@ _resolveWarehouseFilterField: function (oMeta) {
 },
 
 
+_getNumericValidationConfig: function () {
+    return [
+        {
+            fieldPath: "NumberOfSalesOrderItems",
+            label: "Sales Order Items",
+            min: 0,
+            max: null,
+            decimals: 3,
+            allowEmpty: true
+        },
+        {
+            fieldPath: "RecommendedStorageQuantity",
+            label: "Recommended Storage Quantity",
+            min: 0,
+            max: null,
+            decimals: 3,
+            allowEmpty: true
+        },
+        {
+            fieldPath: "DimentioRatio",
+            label: "Dimension Ratio",
+            min: 0,
+            max: null,
+            decimals: 2,
+            allowEmpty: true
+        },
+        {
+            fieldPath: "MinShelfLife",
+            label: "Min Shelf Life",
+            min: 0,
+            max: null,
+            decimals: 0,
+            allowEmpty: true
+        }
+    ];
+},
+
+
+_validateNumericField: function (oInput, oCtx, oCfg) {
+    var oModel = this.getView().getModel();
+
+    if (!oInput || !oCtx || !oCfg) {
+        return true;
+    }
+
+    var sValue = oInput.getValue ? String(oInput.getValue()).trim() : "";
+    var sPath = oCfg.fieldPath;
+
+    //  Empty allowed -> set NULL
+    if (!sValue) {
+        oModel.setProperty(sPath, null, oCtx);
+        oModel.checkUpdate(true);
+
+        if (oInput.setValueState) {
+            oInput.setValueState("None");
+            oInput.setValueStateText("");
+        }
+
+        return true;
+    }
+
+    //  Negative values are not allowed
+    if (sValue.indexOf("-") !== -1) {
+        oModel.setProperty(sPath, null, oCtx);
+        oModel.checkUpdate(true);
+
+        if (oInput.setValue) {
+            oInput.setValue("");
+        }
+
+        if (oInput.setValueState) {
+            oInput.setValueState("Error");
+            oInput.setValueStateText(oCfg.label + " cannot be negative.");
+        }
+
+        return false;
+    }
+
+    // Normalize comma decimal
+    var sNormalized = sValue.replace(",", ".");
+
+    //  Only digits and one decimal separator allowed
+    
+var sRegex = oCfg.decimals > 0
+    ? "^\\d+(\\.\\d{1," + oCfg.decimals + "})?$"
+    : "^\\d+$";
+
+
+    var oRegex = new RegExp(sRegex);
+
+    if (!oRegex.test(sNormalized)) {
+        oModel.setProperty(sPath, null, oCtx);
+        oModel.checkUpdate(true);
+
+        if (oInput.setValue) {
+            oInput.setValue("");
+        }
+
+        if (oInput.setValueState) {
+            oInput.setValueState("Error");
+            oInput.setValueStateText(
+                oCfg.label + " must be a valid non-negative number."
+            );
+        }
+
+        return false;
+    }
+
+    var nValue = Number(sNormalized);
+
+    if (isNaN(nValue)) {
+        oModel.setProperty(sPath, null, oCtx);
+        oModel.checkUpdate(true);
+
+        if (oInput.setValue) {
+            oInput.setValue("");
+        }
+
+        if (oInput.setValueState) {
+            oInput.setValueState("Error");
+            oInput.setValueStateText(
+                oCfg.label + " must be a valid number."
+            );
+        }
+
+        return false;
+    }
+
+    //  Min validation
+    if (oCfg.min !== null && oCfg.min !== undefined && nValue < oCfg.min) {
+        oModel.setProperty(sPath, null, oCtx);
+        oModel.checkUpdate(true);
+
+        if (oInput.setValue) {
+            oInput.setValue("");
+        }
+
+        if (oInput.setValueState) {
+            oInput.setValueState("Error");
+            oInput.setValueStateText(
+                oCfg.label + " must be greater than or equal to " + oCfg.min + "."
+            );
+        }
+
+        return false;
+    }
+
+    //  Max validation, only if configured
+    if (oCfg.max !== null && oCfg.max !== undefined && nValue > oCfg.max) {
+        oModel.setProperty(sPath, null, oCtx);
+        oModel.checkUpdate(true);
+
+        if (oInput.setValue) {
+            oInput.setValue("");
+        }
+
+        if (oInput.setValueState) {
+            oInput.setValueState("Error");
+            oInput.setValueStateText(
+                oCfg.label + " must be less than or equal to " + oCfg.max + "."
+            );
+        }
+
+        return false;
+    }
+
+    //  Valid -> write normalized numeric value
+    oModel.setProperty(sPath, nValue, oCtx);
+    oModel.checkUpdate(true);
+
+    if (oInput.setValueState) {
+        oInput.setValueState("None");
+        oInput.setValueStateText("");
+    }
+
+    return true;
+},
+
+
+_wireNumericValidation: function () {
+    var oSmartTable = this.byId("LineItemsSmartTable");
+    var oTable = oSmartTable && oSmartTable.getTable();
+    var aCfg = this._getNumericValidationConfig();
+
+    if (!oTable) {
+        return;
+    }
+
+    var aItems = oTable.getItems
+        ? oTable.getItems()
+        : (oTable.getRows ? oTable.getRows() : []);
+
+    if (!aItems || !aItems.length) {
+        return;
+    }
+
+    aCfg.forEach(function (oCfg) {
+        var iColIdx = this._findColumnIndexByFieldPath(oTable, oCfg.fieldPath);
+        console.log("NUMERIC FIELD:", oCfg.fieldPath, "COLUMN INDEX:", iColIdx);
+
+        if (iColIdx < 0) {
+            return;
+        }
+
+        aItems.forEach(function (oItem) {
+            var aCells = oItem.getCells ? oItem.getCells() : [];
+            var oCell = aCells[iColIdx];
+            var oInput = this._resolveInputFromCell(oCell);
+
+            
+if (!oInput) {
+    console.log("No input resolved for:", oCfg.fieldPath);
+    return;
+}
+            var sAttachKey = "numericValidationAttached_" + oCfg.fieldPath;
+
+            if (oInput.data && oInput.data(sAttachKey)) {
+                return;
+            }
+
+            if (oInput.data) {
+                oInput.data(sAttachKey, true);
+            }
+
+            var fnValidate = function () {
+                var oCtx = oItem.getBindingContext && oItem.getBindingContext();
+                this._validateNumericField(oInput, oCtx, oCfg);
+            }.bind(this);
+
+            if (oInput.attachChange) {
+                oInput.attachChange(fnValidate);
+            }
+
+            if (oInput.attachLiveChange) {
+                oInput.attachLiveChange(function () {
+                    // prevent minus immediately
+                    var sValue = oInput.getValue ? oInput.getValue() : "";
+                    if (sValue && sValue.indexOf("-") !== -1) {
+                        oInput.setValue("");
+                        oInput.setValueState("Error");
+                        oInput.setValueStateText(oCfg.label + " cannot be negative.");
+                    }
+                });
+            }
+
+            if (oInput.attachBrowserEvent) {
+                oInput.attachBrowserEvent("focusout", fnValidate);
+            }
+
+        }.bind(this));
+    }.bind(this));
+},
+
+
+_validateAllNumericFieldsBeforeSave: function () {
+    var oModel = this.getView().getModel();
+    var oSmartTable = this.byId("LineItemsSmartTable");
+    var oTable = oSmartTable && oSmartTable.getTable();
+    var aCfg = this._getNumericValidationConfig();
+
+    if (!oTable) {
+        return true;
+    }
+
+    var aItems = oTable.getItems
+        ? oTable.getItems()
+        : (oTable.getRows ? oTable.getRows() : []);
+
+    var mPending = oModel.getPendingChanges ? oModel.getPendingChanges() : {};
+    var bAllValid = true;
+
+    aItems.forEach(function (oItem) {
+        var oCtx = oItem.getBindingContext && oItem.getBindingContext();
+
+        if (!oCtx) {
+            return;
+        }
+
+        var sPendingKey = oCtx.getPath().replace(/^\//, "");
+        var oPendingRow = mPending[sPendingKey];
+
+        if (!oPendingRow) {
+            return;
+        }
+
+        aCfg.forEach(function (oCfg) {
+            if (!(oCfg.fieldPath in oPendingRow)) {
+                return;
+            }
+
+            var oInput = this._findInputInRowByFieldPath(oItem, oCfg.fieldPath);
+            var bValid = this._validateNumericField(oInput, oCtx, oCfg);
+
+            if (!bValid) {
+                bAllValid = false;
+            }
+
+        }.bind(this));
+    }.bind(this));
+
+    return bAllValid;
+},
+
 _isNumericField: function (oBinding) {
 
     var oType = oBinding && oBinding.getType && oBinding.getType();
@@ -734,26 +1073,6 @@ onExtend: function () {
     } else {
         this._openExtendDialog();
     }
-},
-
-
-_getCommonSelectedValueForExtend: function (sField) {
-    var aSelectedItems = this.table ? this.table.getSelectedItems() : [];
-
-    if (!aSelectedItems.length) {
-        return "";
-    }
-
-    var vFirst = aSelectedItems[0].getBindingContext().getObject()[sField];
-
-    for (var i = 1; i < aSelectedItems.length; i++) {
-        var vCurrent = aSelectedItems[i].getBindingContext().getObject()[sField];
-        if (vCurrent !== vFirst) {
-            return "";
-        }
-    }
-
-    return vFirst || "";
 },
 
 
@@ -1050,7 +1369,15 @@ onSaveData: async function () {
         }
     }
 
+var bNumericValid = this._validateAllNumericFieldsBeforeSave();
+
+if (!bNumericValid) {
+    sap.m.MessageBox.error("Fix highlighted numeric fields before saving.");
+    return false;
+}
+
     console.log("Starting VH validation BEFORE save...");
+    
 
     var bValid = await this._validateAllConfiguredVHFieldsBeforeSave();
 
@@ -1217,25 +1544,85 @@ _wireGenericVHValidation: function () {
                 return;
             }
 
-// differentiate numeric vs VH fields (DYNAMIC)
+var fnRememberContext = function () {
+    this._rememberVhContext(oItem, oCfg);
+}.bind(this);
+
+
+var fnRememberContext = function () {
+    this._rememberVhContext(oItem, oCfg);
+}.bind(this);
+
+// use V2 key so browser/session does not reuse old attachment flags
+var sRememberKey = "vhRememberAttachedV2_" + oCfg.fieldPath;
+
+var fnAttachRemember = function (oCtrl) {
+    if (!oCtrl) {
+        return;
+    }
+
+    if (oCtrl.data && oCtrl.data(sRememberKey)) {
+        return;
+    }
+
+    if (oCtrl.data) {
+        oCtrl.data(sRememberKey, true);
+    }
+
+    if (oCtrl.attachBrowserEvent) {
+        oCtrl.attachBrowserEvent("focusin", fnRememberContext);
+        oCtrl.attachBrowserEvent("mousedown", fnRememberContext);
+        oCtrl.attachBrowserEvent("click", fnRememberContext);
+    }
+
+    if (oCtrl.attachValueHelpRequest) {
+        oCtrl.attachValueHelpRequest(fnRememberContext);
+    }
+};
+
+// attach to resolved input
+fnAttachRemember(oInput);
+
+// attach to original SmartField/cell too
+fnAttachRemember(oCell);
+
+// attach to inner controls of SmartField/cell if available
+if (oCell && oCell.getInnerControls) {
+    var aInnerControls = oCell.getInnerControls();
+    if (aInnerControls && aInnerControls.length) {
+        aInnerControls.forEach(function (oInnerCtrl) {
+            fnAttachRemember(oInnerCtrl);
+        });
+    }
+}
+
+if (oCell && oCell.findAggregatedObjects) {
+    var aInnerInputs = oCell.findAggregatedObjects(true, function (oControl) {
+        return oControl.isA && (
+            oControl.isA("sap.m.Input") ||
+            oControl.isA("sap.ui.comp.smartfield.SmartField")
+        );
+    });
+
+    aInnerInputs.forEach(function (oInnerCtrl) {
+        fnAttachRemember(oInnerCtrl);
+    });
+}
+
+
 var sMode = this._getFieldValidationMode(oInput, oCfg);
 
-// If it's a VH FIELD → lock typing (only VH allowed)
-
 if (sMode === "VH") {
-
     if (oInput.setShowValueHelp) {
         oInput.setShowValueHelp(true);
     }
 
-    // keep field editable so user can clear it
+    // keep editable so user can clear value
     if (oInput.setEditable) {
         oInput.setEditable(true);
-   
-
+    }
 }
 
-}
 
             var sAttachKey = "vhValidationAttached_" + oCfg.fieldPath;
 
@@ -1429,28 +1816,8 @@ if (bValid) {
 
     //  optional: small feedback (non-blocking)
     sap.m.MessageToast.show("Invalid value removed. Use Value Help.");
-
     resolve(false);
     return;
-
-//  Reset to NULL (clean state)
-if (sAbsolutePath) {
-    oModel.setProperty(sAbsolutePath, null);
-    oModel.checkUpdate(true);
-}
-
-if (oInput.setValue) {
-    oInput.setValue("");
-}
-
-if (oInput.setValueState) {
-    oInput.setValueState("Error");
-    oInput.setValueStateText("Invalid for selected warehouse. Use Value Help.");
-}
-
-
-                    resolve(false);
-                    return;
                 }
 
                 resolve(true);
@@ -1473,6 +1840,17 @@ if (oInput.setValueState) {
 
 
 
+_rememberVhContext: function (oItem, oCfg) {
+    var oCtx = oItem && oItem.getBindingContext && oItem.getBindingContext();
+    var sWarehouseNo = oCtx ? (oCtx.getProperty("WarehouseNo") || "") : "";
+
+    this._lastVhContext = {
+        warehouseNo: sWarehouseNo,
+        fieldPath: oCfg && oCfg.fieldPath ? oCfg.fieldPath : ""
+    };
+
+    console.log("REMEMBER VH CONTEXT:", this._lastVhContext);
+},
 
 
 _validateAllConfiguredVHFieldsBeforeSave: function () {
@@ -1525,7 +1903,7 @@ _validateAllConfiguredVHFieldsBeforeSave: function () {
            
 //  allow empty BUT also PUSH it to model
 
-if (!sValue || sValue === "0" || sValue === "0.000") {
+if (!sValue) {
 
     var oCtxLocal = oItem.getBindingContext();
 
@@ -1533,19 +1911,6 @@ if (!sValue || sValue === "0" || sValue === "0.000") {
     this._setEmptyValue(oModel, oCtxLocal, oCfg.fieldPath);
 
     var oInput = this._findInputInRowByFieldPath(oItem, oCfg.fieldPath);
-
-var sMode = this._getFieldValidationMode(oInput, oCfg);
-
-//  numeric field → skip VH lookup on save
-if (sMode === "NUMERIC") {
-    if (oInput && oInput.setValueState) {
-        oInput.setValueState("None");
-        oInput.setValueStateText("");
-    }
-    aPromises.push(Promise.resolve(true));
-    return;
-}
-
 
     if (oInput && oInput.setValueState) {
         oInput.setValueState("None");
@@ -1932,6 +2297,40 @@ oExtendBtn && oExtendBtn.setEnabled(bExtend);
 
 },
 
+_applyNonUpdatableFieldsReadOnly: function () {
+    var oTable = this.byId("_IDGenTable");
+
+    if (!oTable || !oTable.getItems) {
+        return;
+    }
+
+    var aReadOnlyFields = [
+    ];
+
+    oTable.getItems().forEach(function (oItem) {
+        if (!oItem.findAggregatedObjects) {
+            return;
+        }
+
+        aReadOnlyFields.forEach(function (sField) {
+            var aControls = oItem.findAggregatedObjects(true, function (oControl) {
+                if (!oControl.getBinding) {
+                    return false;
+                }
+
+                var oBinding = oControl.getBinding("value");
+                return !!(oBinding && oBinding.getPath && oBinding.getPath() === sField);
+            });
+
+            aControls.forEach(function (oControl) {
+                if (oControl.setEditable) {
+                    oControl.setEditable(false);
+                }
+            });
+        });
+    });
+},
+
 
 _isExistingWarehouseCombination: function (sMaterialId, sWarehouseNo, sEntitled) {
     var aItems = this.table ? this.table.getItems() : [];
@@ -2302,11 +2701,17 @@ var mProps = {
 
     RelevanceForTwoStepPicking: this._hasMeaningfulMassChangeValue(oTemplate.RelevanceForTwoStepPicking, "RelevanceForTwoStepPicking")
         ? oTemplate.RelevanceForTwoStepPicking
-        : (oSource.RelevanceForTwoStepPicking || ""),
+     : (oSource.RelevanceForTwoStepPicking || ""),
 
-    StagingAreaDoorDetGroup: this._hasMeaningfulMassChangeValue(oTemplate.StagingAreaDoorDetGroup, "StagingAreaDoorDetGroup")
-        ? oTemplate.StagingAreaDoorDetGroup
-        : (oSource.StagingAreaDoorDetGroup || ""),
+    
+
+StagingAreaDoorDetGroup: this._hasMeaningfulMassChangeValue(
+    oTemplate.StagingAreaDoorDetGroup,
+    "StagingAreaDoorDetGroup"
+)
+    ? oTemplate.StagingAreaDoorDetGroup
+    : "",
+
 
     NumberOfSalesOrderItems: this._hasMeaningfulMassChangeValue(oTemplate.NumberOfSalesOrderItems, "NumberOfSalesOrderItems")
         ? oTemplate.NumberOfSalesOrderItems
@@ -2360,6 +2765,27 @@ delete mProps.DemandQuantity;
 oModel.createEntry("/ZEWM_C_MATERIAL", {
     properties: mProps
 });
+
+if (mProps.StagingAreaDoorDetGroup) {
+    var oCfgStaging = this._getVhValidationConfig().find(function (c) {
+        return c.fieldPath === "StagingAreaDoorDetGroup";
+    });
+
+    var oFilterInfo = this._buildDynamicVhFilters(
+        mProps.WarehouseNo,
+        mProps.StagingAreaDoorDetGroup,
+        oCfgStaging
+    );
+
+    if (!oFilterInfo.ok) {
+        iSkipped++;
+        sap.m.MessageBox.error(
+            "Could not validate StagArea/DoorDet.Grp. Check VH configuration."
+        );
+        return;
+    }
+}
+
 console.log("CREATING FOR MATERIAL:", oSource.MaterialNumber, oSource.MaterialId);
         iCreated++;
     }.bind(this));
@@ -2551,7 +2977,7 @@ closeCreateDialog: function () {
                     StorageBinType: val(oFirstItemContext.getProperty("StorageBinType")),
                     StockDeterminationGroup: val(oFirstItemContext.getProperty("StockDeterminationGroup")),
                     RelevanceForTwoStepPicking: val(oFirstItemContext.getProperty("RelevanceForTwoStepPicking")),
-                    StagingAreaDoorDetGroup: val(oFirstItemContext.getProperty("StagingAreaDoorDetGroup")),
+                    StagingAreaDoorDetGroup: "",
                     NumberOfSalesOrderItems: val(oFirstItemContext.getProperty("NumberOfSalesOrderItems")),
                     RecommendedStorageQuantity: val(oFirstItemContext.getProperty("RecommendedStorageQuantity")),
                     DimentioRatio: val(oFirstItemContext.getProperty("DimentioRatio")),
@@ -2582,6 +3008,11 @@ closeCreateDialog: function () {
                     that.oMassDialog = oDialog;
                     that.oContextNewEntry = that._createMassChangeEntry();
                     that.getView().byId("SF1").setBindingContext(that.oContextNewEntry);
+
+                        setTimeout(function () {
+                             that._wireMassChangeVH();
+                            }, 300);
+
                     that.getView().byId("LineItemsSmartTable").setEditable(true);
                     that.onEditToggled();
                     oDialog.open();
@@ -2595,6 +3026,57 @@ closeCreateDialog: function () {
             }
         },
 
+
+_wireMassChangeVH: function () {
+
+    var oDialog = this.oMassDialog;
+    if (!oDialog) {
+        return;
+    }
+
+    var aCfg = this._getVhValidationConfig();
+
+    aCfg.forEach(function (oCfg) {
+
+        var oSmartField = this.getView().byId("SF1")
+            .findAggregatedObjects(true, function (oControl) {
+
+                if (!oControl.getBinding) {
+                    return false;
+                }
+
+                var oBinding = oControl.getBinding("value");
+                return !!(oBinding && oBinding.getPath && oBinding.getPath() === oCfg.fieldPath);
+            })[0];
+
+        if (!oSmartField) {
+            return;
+        }
+
+        if (oSmartField.setShowValueHelp) {
+            oSmartField.setShowValueHelp(true);
+        }
+
+        if (oSmartField.setEditable) {
+            oSmartField.setEditable(true);
+        }
+
+        // OPTIONAL: attach validation if needed
+        var fnHandler = function () {
+
+            var oCtx = oSmartField.getBindingContext();
+            var sWarehouseNo = oCtx ? oCtx.getProperty("WarehouseNo") : "";
+
+            this._validateVHField(oSmartField, sWarehouseNo, oCfg);
+
+        }.bind(this);
+
+        if (oSmartField.attachChange) {
+            oSmartField.attachChange(fnHandler);
+        }
+
+    }.bind(this));
+},
 
 onMassFieldChange: function (oEvent) {
     var oSource = oEvent.getSource();
@@ -2682,88 +3164,116 @@ applyMassChange: async function () {
     var oDialogObject = oModel.getProperty(this.oContextNewEntry.sPath);
 
     // Qty requires UoM only if Qty is meaningfully filled (> 0)
-    if (this._hasMeaningfulMassChangeValue(oDialogObject.RecommendedStorageQuantity, "RecommendedStorageQuantity") &&
-        !this._hasMeaningfulMassChangeValue(oDialogObject.PrefferedAltUoMforWarehouseOp, "PrefferedAltUoMforWarehouseOp")) {
+    if (
+        this._hasMeaningfulMassChangeValue(oDialogObject.RecommendedStorageQuantity, "RecommendedStorageQuantity") &&
+        !this._hasMeaningfulMassChangeValue(oDialogObject.PrefferedAltUoMforWarehouseOp, "PrefferedAltUoMforWarehouseOp")
+    ) {
         sap.m.MessageToast.show("Preferred UoM is required when Recommended Storage Quantity is filled.");
         return;
     }
 
-    var aMassChangeFields = [
-        "PutawayControl",
-        "StorSectInd",
-        "StockRemovalCtrl",
-        "BulkStorage",
-        "ProcBlockProfile",
-        "CtrlIndicatorProcessType",
-        "ProductLoadCategory",
-        "CycleCountingIndicator",
-        "MinShelfLife",
-        "QuantityClassMerchandiseDistr",
-        "PrefferedAltUoMforWarehouseOp",
-        "QualityInspectionGroup",
-        "StorageBinType",
-        "StockDeterminationGroup",
-        "RelevanceForTwoStepPicking",
-        "StagingAreaDoorDetGroup",
-        "NumberOfSalesOrderItems",
-        "RecommendedStorageQuantity",
-        "DimentioRatio",
-        "WeightIndicator",
-        "VolumeIndicator",
-        "WidthIndicator",
-        "HeightIndicator",
-        "LengthIndicator"
-    ];
+  
+var aMassChangeFields = [
+    "PutawayControl",
+    "StorSectInd",
+    "StockRemovalCtrl",
+    "BulkStorage",
+    "ProcBlockProfile",
+    "CtrlIndicatorProcessType",
+    "ProductLoadCategory",
+    "CycleCountingIndicator",
+    "MinShelfLife",
+    "QuantityClassMerchandiseDistr",
+    "PrefferedAltUoMforWarehouseOp",
+    "QualityInspectionGroup",
+    "StorageBinType",
+    "StockDeterminationGroup",
+    "RelevanceForTwoStepPicking",
+    "StagingAreaDoorDetGroup",
+    "NumberOfSalesOrderItems",
+    "RecommendedStorageQuantity",
+    "DimentioRatio",
+    "WeightIndicator",
+    "VolumeIndicator",
+    "WidthIndicator",
+    "HeightIndicator",
+    "LengthIndicator"
+];
 
-   
-aSelectedItems.forEach(function (oItem) {
 
-    var oContext = oItem.getBindingContext();
-    var sWarehouseNo = oContext.getProperty("WarehouseNo") || "";
+    var aValidationPromises = [];
 
-    aMassChangeFields.forEach(function (sField) {
+    aSelectedItems.forEach(function (oItem) {
 
-        if (!this._hasMeaningfulMassChangeValue(oDialogObject[sField], sField)) {
-            return;
-        }
+        var oContext = oItem.getBindingContext();
+        var sWarehouseNo = oContext.getProperty("WarehouseNo") || "";
 
-        var vValue = oDialogObject[sField];
+        aMassChangeFields.forEach(function (sField) {
 
-        //  GET INPUT FIELD FROM ROW
-        var oInput = this._findInputInRowByFieldPath(oItem, sField);
+            if (!this._hasMeaningfulMassChangeValue(oDialogObject[sField], sField)) {
+                return;
+            }
 
-        var oCfg = this._getVhValidationConfig().find(function (c) {
-            return c.fieldPath === sField;
-        });
+            var vValue = oDialogObject[sField];
 
-        //  ONLY validate VH fields
-        if (oCfg) {
+            var oInput = this._findInputInRowByFieldPath(oItem, sField);
 
-            this._validateVHField(oInput, sWarehouseNo, oCfg).then(function (bValid) {
-
-                if (bValid) {
-                    oModel.setProperty(sField, vValue, oContext);
-                } else {
-                    // value was cleared already inside _validateVHField
-                }
-
+            var oVhCfg = this._getVhValidationConfig().find(function (c) {
+                return c.fieldPath === sField;
             });
 
-        } else {
-            // normal fields
-            oModel.setProperty(sField, vValue, oContext);
-        }
+            var oNumericCfg = this._getNumericValidationConfig().find(function (c) {
+                return c.fieldPath === sField;
+            });
+
+            var pValidation = Promise.resolve().then(function () {
+
+                // 1) First write Mass Change value into the row model
+                oModel.setProperty(sField, vValue, oContext);
+                oModel.checkUpdate(true);
+
+                // 2) Sync UI input so validators read the new value
+                if (oInput && oInput.setValue) {
+                    oInput.setValue(
+                        vValue === null || vValue === undefined ? "" : String(vValue)
+                    );
+                }
+
+                // 3) VH field validation
+                if (oVhCfg) {
+                    return this._validateVHField(oInput, sWarehouseNo, oVhCfg);
+                }
+
+                // 4) Numeric field validation
+                if (oNumericCfg) {
+                    return this._validateNumericField(oInput, oContext, oNumericCfg);
+                }
+
+                // 5) Normal field
+                return true;
+
+            }.bind(this));
+
+            aValidationPromises.push(pValidation);
+
+        }.bind(this));
 
     }.bind(this));
 
-}.bind(this));
+    var aResults = await Promise.all(aValidationPromises);
+    var bAllValid = aResults.every(Boolean);
 
-
+    // Close Mass dialog after applying values, so user sees table errors inline
     this.deleteModelEntry(this.oContextNewEntry);
     this.oContextNewEntry = null;
 
     if (this.oMassDialog) {
         this.oMassDialog.close();
+    }
+
+    if (!bAllValid) {
+        sap.m.MessageBox.error("Fix highlighted fields before saving.");
+        return;
     }
 
     var bSuccess = await this.onSaveData();
@@ -3094,9 +3604,17 @@ onEditToggled: function () {
             oEditToggleBtn.setIcon("sap-icon://save");
         }
 
-        setTimeout(function () {
-            this._applyEntitledReadOnly();
-        }.bind(this), 200);
+        
+
+setTimeout(function () {
+    this._wireGenericVHValidation();
+    this._wireNumericValidation();
+
+    this._applyEntitledReadOnly();
+    
+}.bind(this), 600);
+
+
 
     } else {
 
