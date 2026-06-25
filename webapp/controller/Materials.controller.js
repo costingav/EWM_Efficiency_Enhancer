@@ -259,10 +259,6 @@ if (!sWarehouseNo && oController.oMassDialog && oController.oMassDialog.isOpen &
     }
 }
 
-// 4) Do NOT fallback to first visible row
-// If no context is known, leave VH unfiltered
-
-
     console.log("VH FILTER WarehouseNo =", sWarehouseNo, "Dialog title =", sTitle);
 
     // Default to Lgnum for most warehouse-dependent VH entities
@@ -307,42 +303,101 @@ if (sTitle && sTitle.indexOf("Default Pty") !== -1) {
 };
 
 
-                    var fnHideLgnum = function () {
-                        var aCols = oTable.getColumns ? oTable.getColumns() : [];
-                        var aItems = oTable.getItems
-                            ? oTable.getItems()
-                            : (oTable.getRows ? oTable.getRows() : []);
+                   
+var fnHideWarehouseColumn = function () {
 
-                        if (!aItems.length) {
-                            aCols.forEach(function (oCol) {
-                                var oHeader = oCol.getHeader && oCol.getHeader();
-                                var sHeader = oHeader && oHeader.getText && oHeader.getText();
+    var sTitle = oDialog.getTitle && oDialog.getTitle();
 
-                                if (sHeader && sHeader.toLowerCase().includes("warehouse")) {
-                                    oCol.setVisible(false);
-                                }
-                            });
-                            return;
-                        }
+    // Do not hide columns for the Warehouse value help itself
+    if (sTitle && sTitle.toLowerCase().includes("warehouse")) {
+        return;
+    }
 
-                        var aCells = aItems[0].getCells ? aItems[0].getCells() : [];
+    var aCols = oTable.getColumns ? oTable.getColumns() : [];
+    var aRows = oTable.getItems
+        ? oTable.getItems()
+        : (oTable.getRows ? oTable.getRows() : []);
 
-                        aCols.forEach(function (oCol, i) {
-                            if (!aCells[i]) {
-                                return;
-                            }
+    aCols.forEach(function (oCol, iIndex) {
 
-                            var oBinding = aCells[i].getBinding && aCells[i].getBinding("text");
-                            var sPath = oBinding && oBinding.getPath && oBinding.getPath();
+        var bHide = false;
 
-                            if (sPath && sPath.toLowerCase().includes("lgnum")) {
-                                oCol.setVisible(false);
-                            }
-                        });
-                    };
+        // 1) Header / label text check
+        var oHeader = oCol.getHeader && oCol.getHeader();
+        var oLabel = oCol.getLabel && oCol.getLabel();
+
+        var sHeaderText =
+            (oHeader && oHeader.getText && oHeader.getText()) ||
+            (oLabel && oLabel.getText && oLabel.getText()) ||
+            "";
+
+        if (
+            sHeaderText &&
+            (
+                sHeaderText.toLowerCase().includes("warehouse") ||
+                sHeaderText.toLowerCase().includes("lgnum")
+            )
+        ) {
+            bHide = true;
+        }
+
+        // 2) Column personalization / metadata check
+        var vP13nData = oCol.data && oCol.data("p13nData");
+        var sP13nData = "";
+
+        if (typeof vP13nData === "string") {
+            sP13nData = vP13nData;
+        } else if (vP13nData) {
+            try {
+                sP13nData = JSON.stringify(vP13nData);
+            } catch (e) {
+                sP13nData = "";
+            }
+        }
+
+        if (
+            sP13nData &&
+            (
+                sP13nData.indexOf("WarehouseNo") !== -1 ||
+                sP13nData.indexOf("Lgnum") !== -1 ||
+                sP13nData.indexOf("LGNUM") !== -1
+            )
+        ) {
+            bHide = true;
+        }
+
+        // 3) Cell binding check
+        if (!bHide && aRows.length) {
+            var aCells = aRows[0].getCells ? aRows[0].getCells() : [];
+            var oCell = aCells[iIndex];
+
+            if (oCell && oCell.getBinding) {
+                var oTextBinding = oCell.getBinding("text");
+                var oValueBinding = oCell.getBinding("value");
+
+                var sTextPath = oTextBinding && oTextBinding.getPath && oTextBinding.getPath();
+                var sValuePath = oValueBinding && oValueBinding.getPath && oValueBinding.getPath();
+
+                var sPath = (sTextPath || sValuePath || "").toLowerCase();
+
+                if (
+                    sPath.includes("warehouseno") ||
+                    sPath.includes("lgnum")
+                ) {
+                    bHide = true;
+                }
+            }
+        }
+
+        if (bHide && oCol.setVisible) {
+            oCol.setVisible(false);
+        }
+    });
+};
+
 
                     fnApplyWarehouseFilter();
-                    fnHideLgnum();
+                    fnHideWarehouseColumn();
 
                     if (oTable.attachUpdateFinished) {
                         if (oDialog._vhUpdateHandler) {
@@ -351,7 +406,7 @@ if (sTitle && sTitle.indexOf("Default Pty") !== -1) {
 
                         oDialog._vhUpdateHandler = function () {
                             fnApplyWarehouseFilter();
-                            fnHideLgnum();
+                            fnHideWarehouseColumn();
                         };
 
                         oTable.attachUpdateFinished(oDialog._vhUpdateHandler);
@@ -1634,13 +1689,38 @@ if (sMode === "VH") {
                 oInput.data(sAttachKey, true);
             }
 
-            var fnHandler = function () {
-                setTimeout(function () {
-                    var sWarehouseNo = this._getRowWarehouseNo(oItem);
-                    console.log("VALIDATING FIELD:", oCfg.fieldPath);
-                    this._validateVHField(oInput, sWarehouseNo, oCfg);
-                }.bind(this), 200);
-            }.bind(this);
+            
+var fnHandler = function () {
+    setTimeout(function () {
+
+        var oModel = this.getView().getModel();
+        var oCtx = oItem && oItem.getBindingContext && oItem.getBindingContext();
+
+        if (!oModel || !oCtx) {
+            return;
+        }
+
+        var mPending = oModel.getPendingChanges ? oModel.getPendingChanges() : {};
+        var sPendingKey = oCtx.getPath().replace(/^\//, "");
+        var oPendingRow = mPending[sPendingKey];
+
+        //  Do not validate old backend values just because edit mode/rendering happened
+        if (!oPendingRow || !(oCfg.fieldPath in oPendingRow)) {
+            if (oInput && oInput.setValueState) {
+                oInput.setValueState("None");
+                oInput.setValueStateText("");
+            }
+            return;
+        }
+
+        var sWarehouseNo = this._getRowWarehouseNo(oItem);
+        console.log("VALIDATING CHANGED FIELD:", oCfg.fieldPath);
+
+        this._validateVHField(oInput, sWarehouseNo, oCfg);
+
+    }.bind(this), 300);
+}.bind(this);
+
 
             if (oInput.attachChange) {
                 oInput.attachChange(fnHandler);
