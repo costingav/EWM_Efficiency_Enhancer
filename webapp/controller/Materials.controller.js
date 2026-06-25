@@ -181,6 +181,15 @@ setTimeout(function () {
 
             var oDialog = this;
 
+
+var isFilterBarContext = function () {
+
+    // SmartFilterBar dialogs usually have filter bar attached
+    var oFilterBar = oDialog.getFilterBar && oDialog.getFilterBar();
+
+    return !!oFilterBar;
+};
+
             setTimeout(function () {
                 try {
                     if (!oDialog || !oDialog.isA("sap.ui.comp.valuehelpdialog.ValueHelpDialog")) {
@@ -190,10 +199,6 @@ setTimeout(function () {
                     var oTable = oDialog.getTable && oDialog.getTable();
                     if (!oTable) {
                         return;
-                    }
-
-                    if (oTable.isA && oTable.isA("sap.m.Table")) {
-                        oTable.setMode("MultiSelect");
                     }
 
                   
@@ -308,10 +313,17 @@ var fnHideWarehouseColumn = function () {
 
     var sTitle = oDialog.getTitle && oDialog.getTitle();
 
-    // Do not hide columns for the Warehouse value help itself
-    if (sTitle && sTitle.toLowerCase().includes("warehouse")) {
-        return;
-    }
+    
+// 1. Do NOT hide for Warehouse VH itself
+if (sTitle && sTitle.toLowerCase().includes("warehouse")) {
+    return;
+}
+
+// 2. Do NOT hide when opened from SmartFilterBar (global filtering)
+if (isFilterBarContext()) {
+    return;
+}
+
 
     var aCols = oTable.getColumns ? oTable.getColumns() : [];
     var aRows = oTable.getItems
@@ -538,13 +550,31 @@ _getVhValidationConfig: function () {
             valueFieldCandidates: ["ProductLoadCategory", "Wrkldgr"],
             message: "Invalid Product Load Category. Use Value Help."
         },
-        {
-            fieldPath: "BulkStorage",
-            headerText: "Bulk Storage",
-            entitySet: "/ZEWM_I_BULKSTORAGEVH",
-            valueFieldCandidates: ["BulkStorage", "Block", "BLOCK"],
-            message: "Invalid Bulk Storage. Use Value Help."
-        },
+       
+
+{
+    fieldPath: "BulkStorage",
+    headerText: "Bulk Storage",
+    entitySet: "/ZEWM_I_BULKSTORAGEVH",
+
+    //  Bulk Storage VH uses warehouse-specific customizing
+    warehouseField: "Lgnum",
+
+    //  Put likely technical key fields first
+    valueField: "Block",
+    valueFieldCandidates: [
+        "Block",
+        "BLOCK",
+        "BulkStorage",
+        "BulkSt",
+        "Bulkst",
+        "BULKST"
+    ],
+
+    message: "Invalid Bulk Storage. Use Value Help."
+}
+
+,
         {
             fieldPath: "PutawayControl",
             headerText: "Putaway Control",
@@ -697,6 +727,16 @@ _resolveWarehouseFilterField: function (oMeta) {
     return null;
 },
 
+
+_resolveConfiguredField: function (oMeta, sConfiguredField) {
+    if (!oMeta || !oMeta.properties || !sConfiguredField) {
+        return null;
+    }
+
+    return oMeta.properties.find(function (sProp) {
+        return sProp.toLowerCase() === String(sConfiguredField).toLowerCase();
+    }) || null;
+},
 
 _getNumericValidationConfig: function () {
     return [
@@ -1139,12 +1179,17 @@ _resolveValueField: function (oMeta, oCfg) {
     var aProps = oMeta.properties;
     var aCandidates = [];
 
-    if (oCfg.valueFieldCandidates && Array.isArray(oCfg.valueFieldCandidates)) {
-        aCandidates = oCfg.valueFieldCandidates.slice();
+    //  Explicit valueField has highest priority
+    if (oCfg.valueField) {
+        aCandidates.push(oCfg.valueField);
     }
 
-    if (oCfg.valueField && aCandidates.indexOf(oCfg.valueField) === -1) {
-        aCandidates.push(oCfg.valueField);
+    if (oCfg.valueFieldCandidates && Array.isArray(oCfg.valueFieldCandidates)) {
+        oCfg.valueFieldCandidates.forEach(function (sCandidate) {
+            if (aCandidates.indexOf(sCandidate) === -1) {
+                aCandidates.push(sCandidate);
+            }
+        });
     }
 
     if (oCfg.fieldPath && aCandidates.indexOf(oCfg.fieldPath) === -1) {
@@ -1153,17 +1198,28 @@ _resolveValueField: function (oMeta, oCfg) {
 
     for (var i = 0; i < aCandidates.length; i++) {
         var sCandidate = aCandidates[i];
+
         var sFound = aProps.find(function (sProp) {
             return sProp.toLowerCase() === String(sCandidate).toLowerCase();
         });
+
         if (sFound) {
             return sFound;
         }
     }
 
-    console.log("No matching value field found in VH metadata for:", oCfg.fieldPath, "Candidates:", aCandidates, "Available:", aProps);
+    console.log(
+        "No matching value field found in VH metadata for:",
+        oCfg.fieldPath,
+        "Candidates:",
+        aCandidates,
+        "Available:",
+        aProps
+    );
+
     return null;
 },
+
 
 _buildDynamicVhFilters: function (sWarehouseNo, sValue, oCfg) {
     var oMeta = this._getVhEntityMeta(oCfg.entitySet);
@@ -1178,8 +1234,13 @@ _buildDynamicVhFilters: function (sWarehouseNo, sValue, oCfg) {
     }
 
     var aFilters = [];
-    var sWarehouseField = this._resolveWarehouseFilterField(oMeta);
-    var sValueField = this._resolveValueField(oMeta, oCfg);
+    
+var sWarehouseField =
+    this._resolveConfiguredField(oMeta, oCfg.warehouseField) ||
+    this._resolveWarehouseFilterField(oMeta);
+
+var sValueField = this._resolveValueField(oMeta, oCfg);
+
 
     //  only add warehouse filter if entity actually exposes such field
     if (sWarehouseNo && sWarehouseField) {
@@ -1205,6 +1266,15 @@ _buildDynamicVhFilters: function (sWarehouseNo, sValue, oCfg) {
         sap.ui.model.FilterOperator.EQ,
         sValue
     ));
+
+console.log("VH FILTERS BUILT:", {
+        fieldPath: oCfg.fieldPath,
+        warehouseField: sWarehouseField,
+        warehouseNo: sWarehouseNo,
+        valueField: sValueField,
+        value: sValue,
+        entitySet: oCfg.entitySet
+    });
 
     return {
         ok: true,
@@ -1603,11 +1673,6 @@ var fnRememberContext = function () {
     this._rememberVhContext(oItem, oCfg);
 }.bind(this);
 
-
-var fnRememberContext = function () {
-    this._rememberVhContext(oItem, oCfg);
-}.bind(this);
-
 // use V2 key so browser/session does not reuse old attachment flags
 var sRememberKey = "vhRememberAttachedV2_" + oCfg.fieldPath;
 
@@ -1704,7 +1769,7 @@ var fnHandler = function () {
         var sPendingKey = oCtx.getPath().replace(/^\//, "");
         var oPendingRow = mPending[sPendingKey];
 
-        //  Do not validate old backend values just because edit mode/rendering happened
+        // Do not validate old backend values just because edit mode/rendering happened
         if (!oPendingRow || !(oCfg.fieldPath in oPendingRow)) {
             if (oInput && oInput.setValueState) {
                 oInput.setValueState("None");
@@ -1713,26 +1778,62 @@ var fnHandler = function () {
             return;
         }
 
+        // Read the committed model value, not the possibly stale UI value
+        var vModelValue = oCtx.getProperty(oCfg.fieldPath);
+        var sModelValue = (vModelValue === null || vModelValue === undefined)
+            ? ""
+            : String(vModelValue).trim();
+
+        // Sync UI FROM model, never model FROM UI here
+        if (oInput && oInput.setValue && oInput.getValue) {
+            var sCurrentUiValue = String(oInput.getValue() || "").trim();
+
+            if (sCurrentUiValue !== sModelValue) {
+                oInput.setValue(sModelValue);
+            }
+        }
+
         var sWarehouseNo = this._getRowWarehouseNo(oItem);
-        console.log("VALIDATING CHANGED FIELD:", oCfg.fieldPath);
 
-        this._validateVHField(oInput, sWarehouseNo, oCfg);
+        console.log(
+            "VALIDATING CHANGED FIELD:",
+            oCfg.fieldPath,
+            "MODEL VALUE:",
+            sModelValue,
+            "WAREHOUSE:",
+            sWarehouseNo
+        );
 
-    }.bind(this), 300);
+       this._validateVHField(oInput, sWarehouseNo, oCfg, sModelValue);
+
+    }.bind(this), 500);
 }.bind(this);
 
 
-            if (oInput.attachChange) {
-                oInput.attachChange(fnHandler);
-            }
+var sValidationAttachKey = "vhValidationAttachedV2_" + oCfg.fieldPath;
 
-            if (oInput.attachLiveChange) {
-                oInput.attachLiveChange(fnHandler);
-            }
+var fnAttachValidation = function (oCtrl) {
+    if (!oCtrl) {
+        return;
+    }
 
-            if (oInput.attachBrowserEvent) {
-                oInput.attachBrowserEvent("focusout", fnHandler);
-            }
+    if (oCtrl.data && oCtrl.data(sValidationAttachKey)) {
+        return;
+    }
+
+    if (oCtrl.data) {
+        oCtrl.data(sValidationAttachKey, true);
+    }
+
+    if (oCtrl.attachChange) {
+        oCtrl.attachChange(fnHandler);
+    }
+};
+
+// attach validation to both inner input and SmartField/cell
+fnAttachValidation(oInput);
+fnAttachValidation(oCell);
+
 
         }.bind(this));
 
@@ -1798,12 +1899,19 @@ _forceAllColumnsVisible: function () {
 
 
 
-_validateVHField: function (oInput, sWarehouseNo, oCfg) {
+_validateVHField: function (oInput, sWarehouseNo, oCfg, sForcedValue) {
 
     var oModel = this.getView().getModel();
 
-    var sValue = oInput && oInput.getValue ? oInput.getValue() : "";
-    sValue = (sValue || "").trim();
+   
+var sValue = "";
+
+if (sForcedValue !== undefined && sForcedValue !== null) {
+    sValue = String(sForcedValue).trim();
+} else {
+    sValue = oInput && oInput.getValue ? String(oInput.getValue() || "").trim() : "";
+}
+
 
     var oBinding = oInput && oInput.getBinding && oInput.getBinding("value");
     var oCtx = oBinding && oBinding.getContext ? oBinding.getContext() : null;
@@ -1857,15 +1965,13 @@ _validateVHField: function (oInput, sWarehouseNo, oCfg) {
                 var bValid = !!(oData && oData.results && oData.results.length > 0);
 
              
+
+
 if (bValid) {
 
-    //  write valid value to model
-    if (sAbsolutePath) {
-        oModel.setProperty(sAbsolutePath, sValue);
-        oModel.checkUpdate(true);
-    }
+    // ✅ Do not write to model here.
+    // SmartField/OData binding already wrote the value.
 
-    //  clear error state
     if (oInput && oInput.setValueState) {
         oInput.setValueState("None");
         oInput.setValueStateText("");
@@ -1873,11 +1979,14 @@ if (bValid) {
 
 } else {
 
+
     // CRITICAL: clear invalid value (DO NOT keep it)
-    if (sAbsolutePath) {
-        oModel.setProperty(sAbsolutePath, null);
-        oModel.checkUpdate(true);
-    }
+   
+if (oCtx && sRelativePath) {
+    oModel.setProperty(sRelativePath, null, oCtx);
+    oModel.checkUpdate(true);
+}
+
 
     //  clear UI value
     if (oInput && oInput.setValue) {
@@ -2364,7 +2473,7 @@ console.log("EXTEND ENABLE?", bExtend, aSelectedItems.length);
             // reset flag after short delay (prevents spam)
             setTimeout(() => {
                 this._bWarehouseWarningShown = false;
-            }, 500);
+            }, 300);
         }
     }
 
