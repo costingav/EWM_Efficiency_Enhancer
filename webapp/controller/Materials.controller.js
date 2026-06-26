@@ -272,7 +272,6 @@ var sWarehouseField = "Lgnum";
 
 // These known VHs use WarehouseNo instead
 
-
 if (sTitle && (
     sTitle.indexOf("Storage Bin") !== -1 ||
     sTitle.indexOf("Proc.Type Det.") !== -1 ||
@@ -306,9 +305,7 @@ if (sTitle && sTitle.indexOf("Default Pty") !== -1) {
     }
 
 };
-
-
-                   
+         
 var fnHideWarehouseColumn = function () {
 
     var sTitle = oDialog.getTitle && oDialog.getTitle();
@@ -634,6 +631,7 @@ _getVhValidationConfig: function () {
         {
             fieldPath: "WeightIndicator",
             headerText: "Weight Indicator",
+            warehouseField: "Lgnum",
             entitySet: "/ZEWM_I_WEIGHTINDVH",
             valueFieldCandidates: ["WeightIndicator", "Dimind"],
             message: "Invalid Weight Indicator. Use Value Help."
@@ -641,20 +639,27 @@ _getVhValidationConfig: function () {
         {
             fieldPath: "VolumeIndicator",
             headerText: "Volume Indicator",
+            warehouseField: "Lgnum",
             entitySet: "/ZEWM_I_VOLUMEINDVH",
             valueFieldCandidates: ["VolumeIndicator", "Dimind"],
             message: "Invalid Volume Indicator. Use Value Help."
         },
-        {
-            fieldPath: "LengthIndicator",
-            headerText: "Length Indicator",
-            entitySet: "/ZEWM_I_LENGTHINDVH",
-            valueFieldCandidates: ["LengthIndicator", "Dimind"],
-            message: "Invalid Length Indicator. Use Value Help."
-        },
+       
+{
+    fieldPath: "LengthIndicator",
+    headerText: "Length Indicator",
+    entitySet: "/ZEWM_I_LENGTHINDVH",
+    warehouseField: "Lgnum",
+    valueField: "LengthIndicator",
+    valueFieldCandidates: ["LengthIndicator", "Dimind"],
+    message: "Invalid Length Indicator. Use Value Help."
+}
+
+,
         {
             fieldPath: "WidthIndicator",
             headerText: "Width Indicator",
+            warehouseField: "Lgnum",
             entitySet: "/ZEWM_I_WIDTHINDVH",
             valueFieldCandidates: ["WidthIndicator", "Dimind"],
             message: "Invalid Width Indicator. Use Value Help."
@@ -662,6 +667,7 @@ _getVhValidationConfig: function () {
         {
             fieldPath: "HeightIndicator",
             headerText: "Height Indicator",
+            warehouseField: "Lgnum",
             entitySet: "/ZEWM_I_HEIGHTINDVH",
             valueFieldCandidates: ["HeightIndicator", "Dimind"],
             message: "Invalid Height Indicator. Use Value Help."
@@ -1932,17 +1938,21 @@ if (sForcedValue !== undefined && sForcedValue !== null) {
     }
 
     //  empty allowed
-    if (!sValue) {
-        if (sAbsolutePath) {
-            oModel.setProperty(sAbsolutePath, null);
-            oModel.checkUpdate(true);
-        }
-        if (oInput.setValueState) {
-            oInput.setValueState("None");
-            oInput.setValueStateText("");
-        }
-        return Promise.resolve(true);
+
+if (!sValue) {
+    if (oCtx && sRelativePath) {
+        oModel.setProperty(sRelativePath, null, oCtx);
+        oModel.checkUpdate(true);
     }
+
+    if (oInput && oInput.setValueState) {
+        oInput.setValueState("None");
+        oInput.setValueStateText("");
+    }
+
+    return Promise.resolve(true);
+}
+
 
     return new Promise(function (resolve) {
 
@@ -1979,16 +1989,14 @@ if (bValid) {
 
 } else {
 
-
-    // CRITICAL: clear invalid value (DO NOT keep it)
    
+    // clear invalid value from model
+
 if (oCtx && sRelativePath) {
     oModel.setProperty(sRelativePath, null, oCtx);
     oModel.checkUpdate(true);
 }
 
-
-    //  clear UI value
     if (oInput && oInput.setValue) {
         oInput.setValue("");
     }
@@ -2914,25 +2922,27 @@ StagingAreaDoorDetGroup: this._hasMeaningfulMassChangeValue(
         ? oTemplate.DimentioRatio
         : (oSource.DimentioRatio || 0),
 
-    WeightIndicator: this._hasMeaningfulMassChangeValue(oTemplate.WeightIndicator, "WeightIndicator")
-        ? oTemplate.WeightIndicator
-        : (oSource.WeightIndicator || ""),
 
-    VolumeIndicator: this._hasMeaningfulMassChangeValue(oTemplate.VolumeIndicator, "VolumeIndicator")
-        ? oTemplate.VolumeIndicator
-        : (oSource.VolumeIndicator || ""),
+WeightIndicator: this._hasMeaningfulMassChangeValue(oTemplate.WeightIndicator, "WeightIndicator")
+    ? oTemplate.WeightIndicator
+    : "",
 
-    LengthIndicator: this._hasMeaningfulMassChangeValue(oTemplate.LengthIndicator, "LengthIndicator")
-        ? oTemplate.LengthIndicator
-        : (oSource.LengthIndicator || ""),
+VolumeIndicator: this._hasMeaningfulMassChangeValue(oTemplate.VolumeIndicator, "VolumeIndicator")
+    ? oTemplate.VolumeIndicator
+    : "",
 
-    WidthIndicator: this._hasMeaningfulMassChangeValue(oTemplate.WidthIndicator, "WidthIndicator")
-        ? oTemplate.WidthIndicator
-        : (oSource.WidthIndicator || ""),
+LengthIndicator: this._hasMeaningfulMassChangeValue(oTemplate.LengthIndicator, "LengthIndicator")
+    ? oTemplate.LengthIndicator
+    : "",
 
-    HeightIndicator: this._hasMeaningfulMassChangeValue(oTemplate.HeightIndicator, "HeightIndicator")
-        ? oTemplate.HeightIndicator
-        : (oSource.HeightIndicator || "")
+WidthIndicator: this._hasMeaningfulMassChangeValue(oTemplate.WidthIndicator, "WidthIndicator")
+    ? oTemplate.WidthIndicator
+    : "",
+
+HeightIndicator: this._hasMeaningfulMassChangeValue(oTemplate.HeightIndicator, "HeightIndicator")
+    ? oTemplate.HeightIndicator
+    : ""
+
 };
 
 
@@ -3170,11 +3180,12 @@ closeCreateDialog: function () {
                     NumberOfSalesOrderItems: val(oFirstItemContext.getProperty("NumberOfSalesOrderItems")),
                     RecommendedStorageQuantity: val(oFirstItemContext.getProperty("RecommendedStorageQuantity")),
                     DimentioRatio: val(oFirstItemContext.getProperty("DimentioRatio")),
-                    WeightIndicator: val(oFirstItemContext.getProperty("WeightIndicator")),
-                    VolumeIndicator: val(oFirstItemContext.getProperty("VolumeIndicator")),
-                    WidthIndicator: val(oFirstItemContext.getProperty("WidthIndicator")),
-                    HeightIndicator: val(oFirstItemContext.getProperty("HeightIndicator")),
-                    LengthIndicator: val(oFirstItemContext.getProperty("LengthIndicator")),
+                    WeightIndicator: "",
+                    VolumeIndicator: "",
+                    LengthIndicator: "",
+                    WidthIndicator: "",
+                    HeightIndicator: "",
+
                 }
             });
         },
@@ -3206,13 +3217,20 @@ closeCreateDialog: function () {
                     that.onEditToggled();
                     oDialog.open();
                 });
-            } else {
-                that.oContextNewEntry = that._createMassChangeEntry();
-                that.getView().byId("SF1").setBindingContext(that.oContextNewEntry);
-                this.getView().byId("LineItemsSmartTable").setEditable(true);
-                that.onEditToggled();
-                this.oMassDialog.open();
-            }
+            
+} else {
+    that.oContextNewEntry = that._createMassChangeEntry();
+    that.getView().byId("SF1").setBindingContext(that.oContextNewEntry);
+
+    setTimeout(function () {
+        that._wireMassChangeVH();
+    }, 300);
+
+    this.getView().byId("LineItemsSmartTable").setEditable(true);
+    that.onEditToggled();
+    this.oMassDialog.open();
+}
+
         },
 
 
@@ -3516,8 +3534,10 @@ var aMassChangeFields = [
                     DimentioRatio: getCommonValue("DimentioRatio"),
                     WeightIndicator: getCommonValue("WeightIndicator"),
                     VolumeIndicator: getCommonValue("VolumeIndicator"),
+                    LengthIndicator: getCommonValue("LengthIndicator"),
                     WidthIndicator: getCommonValue("WidthIndicator"),
                     HeightIndicator: getCommonValue("HeightIndicator")
+
                 }
             });
         },
