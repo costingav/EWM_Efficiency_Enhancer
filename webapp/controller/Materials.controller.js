@@ -2840,67 +2840,43 @@ var mProps = {
     WarehouseNo: oTemplate.WarehouseNo || "",
     Entitled: oTemplate.Entitled || "",
 
-    PutawayControl: this._hasMeaningfulMassChangeValue(oTemplate.PutawayControl, "PutawayControl")
-        ? oTemplate.PutawayControl
-        : (oSource.PutawayControl || ""),
+    PutawayControl: oTemplate.PutawayControl || "",
 
-    StorSectInd: this._hasMeaningfulMassChangeValue(oTemplate.StorSectInd, "StorSectInd")
-        ? oTemplate.StorSectInd
-        : (oSource.StorSectInd || ""),
+    StorSectInd: oTemplate.StorSectInd || "",
 
-    StockRemovalCtrl: this._hasMeaningfulMassChangeValue(oTemplate.StockRemovalCtrl, "StockRemovalCtrl")
-        ? oTemplate.StockRemovalCtrl
-        : (oSource.StockRemovalCtrl || ""),
+    StockRemovalCtrl: oTemplate.StockRemovalCtrl || "",
 
-    BulkStorage: this._hasMeaningfulMassChangeValue(oTemplate.BulkStorage, "BulkStorage")
-        ? oTemplate.BulkStorage
-        : (oSource.BulkStorage || ""),
+    BulkStorage: oTemplate.BulkStorage || "",
 
-    ProcBlockProfile: this._hasMeaningfulMassChangeValue(oTemplate.ProcBlockProfile, "ProcBlockProfile")
-        ? oTemplate.ProcBlockProfile
-        : (oSource.ProcBlockProfile || ""),
+    ProcBlockProfile: oTemplate.ProcBlockProfile || "",
 
-    CtrlIndicatorProcessType: this._hasMeaningfulMassChangeValue(oTemplate.CtrlIndicatorProcessType, "CtrlIndicatorProcessType")
-        ? oTemplate.CtrlIndicatorProcessType
-        : (oSource.CtrlIndicatorProcessType || ""),
+    CtrlIndicatorProcessType: oTemplate.CtrlIndicatorProcessType || "",
 
-    ProductLoadCategory: this._hasMeaningfulMassChangeValue(oTemplate.ProductLoadCategory, "ProductLoadCategory")
-        ? oTemplate.ProductLoadCategory
-        : (oSource.ProductLoadCategory || ""),
+    ProductLoadCategory: oTemplate.ProductLoadCategory || "",
 
-    CycleCountingIndicator: this._hasMeaningfulMassChangeValue(oTemplate.CycleCountingIndicator, "CycleCountingIndicator")
-        ? oTemplate.CycleCountingIndicator
-        : (oSource.CycleCountingIndicator || ""),
+    CycleCountingIndicator: oTemplate.CycleCountingIndicator || "",
 
     MinShelfLife: this._hasMeaningfulMassChangeValue(oTemplate.MinShelfLife, "MinShelfLife")
         ? oTemplate.MinShelfLife
         : (oSource.MinShelfLife || 0),
 
-    QuantityClassMerchandiseDistr: this._hasMeaningfulMassChangeValue(oTemplate.QuantityClassMerchandiseDistr, "QuantityClassMerchandiseDistr")
-        ? oTemplate.QuantityClassMerchandiseDistr
-        : (oSource.QuantityClassMerchandiseDistr || ""),
-
-    PrefferedAltUoMforWarehouseOp: this._hasMeaningfulMassChangeValue(oTemplate.PrefferedAltUoMforWarehouseOp, "PrefferedAltUoMforWarehouseOp")
-        ? oTemplate.PrefferedAltUoMforWarehouseOp
-        : (oSource.PrefferedAltUoMforWarehouseOp || ""),
-
-    QualityInspectionGroup: this._hasMeaningfulMassChangeValue(oTemplate.QualityInspectionGroup, "QualityInspectionGroup")
-        ? oTemplate.QualityInspectionGroup
-        : (oSource.QualityInspectionGroup || ""),
-
-    StorageBinType: this._hasMeaningfulMassChangeValue(oTemplate.StorageBinType, "StorageBinType")
-        ? oTemplate.StorageBinType
-        : (oSource.StorageBinType || ""),
-
-    StockDeterminationGroup: this._hasMeaningfulMassChangeValue(oTemplate.StockDeterminationGroup, "StockDeterminationGroup")
-        ? oTemplate.StockDeterminationGroup
-        : (oSource.StockDeterminationGroup || ""),
-
-    RelevanceForTwoStepPicking: this._hasMeaningfulMassChangeValue(oTemplate.RelevanceForTwoStepPicking, "RelevanceForTwoStepPicking")
-        ? oTemplate.RelevanceForTwoStepPicking
-     : (oSource.RelevanceForTwoStepPicking || ""),
+    QuantityClassMerchandiseDistr: oTemplate.QuantityClassMerchandiseDistr || "",
 
     
+PrefferedAltUoMforWarehouseOp:
+    oTemplate.PrefferedAltUoMforWarehouseOp || "",
+
+
+    QualityInspectionGroup: oTemplate.QualityInspectionGroup || "",
+
+    StorageBinType:oTemplate.StorageBinType || "",
+
+    StockDeterminationGroup: oTemplate.StockDeterminationGroup || "",
+
+    
+RelevanceForTwoStepPicking:
+    oTemplate.RelevanceForTwoStepPicking || "",
+
 
 StagingAreaDoorDetGroup: this._hasMeaningfulMassChangeValue(
     oTemplate.StagingAreaDoorDetGroup,
