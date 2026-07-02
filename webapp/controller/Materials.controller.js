@@ -3175,6 +3175,9 @@ closeCreateDialog: function () {
         // =========================================================
 
         onMassChange: function () {
+
+            this._changedMassFields = {};
+
             var that = this;
 
             if (!this.oMassDialog) {
@@ -3274,6 +3277,11 @@ onMassFieldChange: function (oEvent) {
     var vValue = oContext ? oContext.getProperty(sPath) : (oSource.getValue ? oSource.getValue() : null);
 
     this.getView().getModel().setProperty(sPath, vValue, this.oContextNewEntry);
+
+
+    this._changedMassFields = this._changedMassFields || {};
+    this._changedMassFields[sPath] = true;
+
 
     console.log("Mass Change field updated:", sPath, "=", vValue);
 },
@@ -3393,9 +3401,12 @@ var aMassChangeFields = [
 
         aMassChangeFields.forEach(function (sField) {
 
-            if (!this._hasMeaningfulMassChangeValue(oDialogObject[sField], sField)) {
-                return;
-            }
+            
+if (!this._changedMassFields ||
+    !this._changedMassFields[sField]) {
+    return;
+}
+
 
             var vValue = oDialogObject[sField];
 
@@ -3464,6 +3475,7 @@ var aMassChangeFields = [
     if (!bSuccess) {
         return;
     }
+    this._changedMassFields = {};
 },
 
         _createMassChangeEntry: function () {
