@@ -37,8 +37,6 @@ onInit: function () {
     if (oSmartFilterBar) {
         oSmartFilterBar.attachSearch(function () {
 
-            var aInvalidFields = [];
-
             oSmartFilterBar.getAllFilterItems().forEach(function (oItem) {
 
                 var oControl = oItem.getControl();
@@ -46,30 +44,7 @@ onInit: function () {
                     return;
                 }
 
-                var sValue = "";
-
-                if (oControl.getValue) {
-                    sValue = oControl.getValue();
-                } else if (oControl.getSelectedKey) {
-                    sValue = oControl.getSelectedKey();
-                }
-
-                // check invalid length (generic safety)
-                if (sValue && sValue.length > 4) {
-                    oControl.setValue("");
-                    oControl.setSelectedKey && oControl.setSelectedKey("");
-
-                    aInvalidFields.push(oItem.getLabel());
-                }
-
             });
-
-            // User feedback (clean UX)
-            if (aInvalidFields.length > 0) {
-                sap.m.MessageToast.show(
-                    "Some filters were cleared because of invalid values."
-                );
-            }
 
         }.bind(this));
     }
@@ -2571,11 +2546,7 @@ _isExistingWarehouseCombination: function (sMaterialId, sWarehouseNo, sEntitled)
 
     var oBindingParams = oEvent.getParameter("bindingParams");
 
-    //  disable $skip cache behavior
-    oBindingParams.parameters = oBindingParams.parameters || {};
-    oBindingParams.parameters["$top"] = 1000;
-
-    //  FORCE new request (important)
+    //  FORCE new request (important) — disables $skip cache
     oBindingParams.preventTableBind = false;
 },
 
