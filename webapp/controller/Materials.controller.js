@@ -646,7 +646,19 @@ _getVhValidationConfig: function () {
             entitySet: "/ZEWM_I_HEIGHTINDVH",
             valueFieldCandidates: ["HeightIndicator", "Dimind"],
             message: "Invalid Height Indicator. Use Value Help."
-        }
+        },
+
+{
+    fieldPath: "Entitled",
+    headerText: "Default Pty Entitld",
+    entitySet: "/ZEWM_I_ENTITLEDVH",
+    warehouseField: "Lgnum",
+    valueFieldCandidates: [
+        "Entitled"
+    ],
+    message: "Invalid Party Entitled for this Warehouse. Use Value Help."
+},
+
     ];
 },
 
@@ -2779,12 +2791,19 @@ if (!this.oContextNewEntry) {
     aSelectedItems.forEach(function (oItem) {
         var oSource = oItem.getBindingContext().getObject();
 
+
 if (bIsExtend) {
+
     var sSourceWarehouse = oSource.WarehouseNo || "";
     var sTargetWarehouse = oTemplate.WarehouseNo || "";
 
-    // Extend must create a different warehouse from source
-    if (sSourceWarehouse && sTargetWarehouse && sSourceWarehouse === sTargetWarehouse) {
+    var sSourceEntitled = oSource.Entitled || "";
+    var sTargetEntitled = oTemplate.Entitled || "";
+
+    if (
+        sSourceWarehouse === sTargetWarehouse &&
+        sSourceEntitled === sTargetEntitled
+    ) {
         iSkipped++;
         return;
     }
