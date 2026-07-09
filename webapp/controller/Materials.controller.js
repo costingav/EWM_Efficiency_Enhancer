@@ -1966,8 +1966,6 @@ if (!sValue) {
 
 if (bValid) {
 
-    // ✅ Do not write to model here.
-    // SmartField/OData binding already wrote the value.
 
     if (oInput && oInput.setValueState) {
         oInput.setValueState("None");
